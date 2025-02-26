@@ -1,0 +1,5 @@
+main.exe
+src/
+SDL2.dll
+data/
+.vscode/
