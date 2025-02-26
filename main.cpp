@@ -16,6 +16,24 @@ enum KeyPressSurfaces{
     KEY_PRESS_SURFACE_TOTAL
 };
 
+struct MenuButton{
+    int x,y,height,width;
+    SDL_Surface* img_surface = NULL;
+    string img_path;
+    MenuButton(int _x, int _y, int _h, int _w, string _path){
+        x = _x;
+        y = _y;
+        height = _h;
+        width = _w;
+        img_path = _path.c_str();
+    }
+    void load_image(){
+        img_surface = IMG_Load(img_path);
+    }
+    void on_click(){
+        cout << "Button clicked at (" << x << ", " << y << ")" << endl;
+    }
+};
 void init(){
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         cout << "SDL could not initialize! SDL_Error: " << SDL_GetError() << endl;
@@ -33,6 +51,7 @@ void init(){
 
 void loadImage(string imgPath){
     imageSurface = IMG_Load(imgPath.c_str());
+
 }
 
 void close(){
@@ -45,7 +64,7 @@ void close(){
 
 int main(int argc, char *argv[]){
     init();
-    loadImage("img/hello_world.bmp");
+    loadImage("img/menu/Options Button.png");
     SDL_Event e;
     bool quit = false;
     //Game loop 
@@ -53,10 +72,6 @@ int main(int argc, char *argv[]){
         //Event queue
         while(SDL_PollEvent(&e)){
             if(e.type == SDL_QUIT) quit = true;
-            // else if (e.type = SDL_KEYDOWN){
-            //     if (e.type = KEY_PRESS_SURFACE_SPACE)
-                
-            // }
         }
         SDL_BlitSurface(imageSurface, NULL, screenSurface, NULL);
         SDL_UpdateWindowSurface(window);
