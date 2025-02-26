@@ -1,5 +1,6 @@
 #include <iostream>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <string>
 using namespace std;
 
@@ -31,7 +32,7 @@ void init(){
 }
 
 void loadImage(string imgPath){
-    imageSurface = SDL_LoadBMP(imgPath.c_str());
+    imageSurface = IMG_Load(imgPath.c_str());
 }
 
 void close(){
