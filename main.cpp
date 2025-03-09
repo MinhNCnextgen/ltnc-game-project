@@ -1,81 +1,125 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <string>
 using namespace std;
 
-const int SCREEN_WIDTH = 1000;
-const int SCREEN_HEIGHT = 600;
-SDL_Window* window = NULL;
-SDL_Surface* screenSurface = NULL;
-SDL_Surface* imageSurface = NULL;  
+const int SCREEN_WIDTH = 1280;
+const int SCREEN_HEIGHT = 720;
+const char* WINDOW_TITLE = "Drum it!";
+string game_state = "menu";
 
-enum KeyPressSurfaces{
-    KEY_PRESS_SURFACE_DEFAULT,
-    KEY_PRESS_SURFACE_SPACE,
-    KEY_PRESS_SURFACE_TOTAL
-};
-
-struct MenuButton{
-    int x,y,height,width;
-    SDL_Surface* img_surface = NULL;
-    string img_path;
-    MenuButton(int _x, int _y, int _h, int _w, string _path){
-        x = _x;
-        y = _y;
-        height = _h;
-        width = _w;
-        img_path = _path.c_str();
-    }
-    void load_image(){
-        img_surface = IMG_Load(img_path);
-    }
-    void on_click(){
-        cout << "Button clicked at (" << x << ", " << y << ")" << endl;
-    }
-};
-void init(){
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-        cout << "SDL could not initialize! SDL_Error: " << SDL_GetError() << endl;
-    } else {
-        window = SDL_CreateWindow("game", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-        if (window == NULL) {
-            cout << "Window could not be created! SDL_Error: " << SDL_GetError() << endl;
-        } else {
-            screenSurface = SDL_GetWindowSurface(window);
-            SDL_FillRect(screenSurface, NULL, SDL_MapRGB(screenSurface->format, 0xFF, 0xFF, 0xFF));
-            SDL_UpdateWindowSurface(window);
-        }
-    }
-}
-
-void loadImage(string imgPath){
-    imageSurface = IMG_Load(imgPath.c_str());
-
-}
-
-void close(){
-    SDL_FreeSurface(imageSurface);
-    imageSurface = NULL;
-    SDL_DestroyWindow(window);
-    window = NULL;
+void logErrorAndExit(const char* msg, const char* error){
+    SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "%s: %s", msg, error);
     SDL_Quit();
 }
 
-int main(int argc, char *argv[]){
-    init();
-    loadImage("img/menu/Options Button.png");
-    SDL_Event e;
-    bool quit = false;
-    //Game loop 
-    while(!quit){
-        //Event queue
-        while(SDL_PollEvent(&e)){
-            if(e.type == SDL_QUIT) quit = true;
-        }
-        SDL_BlitSurface(imageSurface, NULL, screenSurface, NULL);
-        SDL_UpdateWindowSurface(window);
+SDL_Window* initSDL(int SCREEN_WIDTH, int SCREEN_HEIGHT, const char* WINDOW_TITLE){
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+        logErrorAndExit("SDL_Init", SDL_GetError());
+
+    SDL_Window* window = SDL_CreateWindow(WINDOW_TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    if (window == nullptr) logErrorAndExit("CreateWindow", SDL_GetError());
+
+    if (!IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG)) 
+        logErrorAndExit("SDL_image error:", IMG_GetError());
+
+    return window;
+}
+
+SDL_Renderer* createRenderer(SDL_Window* window)
+{
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == nullptr) logErrorAndExit("CreateRenderer", SDL_GetError());
+
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+    SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    return renderer;
+}
+
+void quitSDL(SDL_Window* window, SDL_Renderer* renderer)
+{
+    IMG_Quit();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+}
+
+//Texture struct
+struct Texture {
+    SDL_Renderer* renderer;
+    SDL_Texture* texture;
+
+    Texture(SDL_Renderer* ren, const char* path) : renderer(ren), texture(nullptr)
+    {
+        SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Loading %s", path);
+        texture = IMG_LoadTexture(renderer, path);
+        if (texture == NULL)
+            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "Load texture %s", IMG_GetError());
     }
-    close();
+
+    ~Texture()
+    {
+        destroy();
+    }
+
+    void render(int x, int y, int w, int h)
+    {
+        SDL_Rect dest;
+        dest.x = x;
+        dest.y = y;
+        dest.w = w;
+        dest.h = h;
+        // SDL_QueryTexture(texture, NULL, NULL, &dest.w, &dest.h);
+        SDL_RenderCopy(renderer, texture, NULL, &dest);
+    }
+
+    void render_background()
+    {
+        SDL_RenderCopy(renderer, texture, NULL, NULL);
+    }
+
+    void destroy()
+    {
+        if (texture != nullptr)
+        {
+            SDL_DestroyTexture(texture);
+            texture = nullptr;
+        }
+    }
+};
+
+int main(int argc, char* argv[])
+{
+    //Init
+    SDL_Window* window = initSDL(SCREEN_WIDTH, SCREEN_HEIGHT, WINDOW_TITLE);
+    SDL_Renderer* renderer = createRenderer(window);
+    //Game texture 
+    Texture background(renderer, "assets/menu/background.png");
+    Texture play_button(renderer, "assets/menu/Play Button.png");
+    Texture quit_button(renderer, "assets/menu/Quit Button.png");
+    //Game loop
+    bool running = true;
+    SDL_Event event;
+    while (running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = false;
+            }
+        }
+
+        // Clear the renderer
+        SDL_RenderClear(renderer);
+        // Render textures
+        if (game_state == "menu"){
+            background.render_background();
+            play_button.render(390, 100, 500, 200);
+            quit_button.render(390, 400, 500, 200);
+        }
+
+        // Update renderer
+        SDL_RenderPresent(renderer);
+    }
+    quitSDL(window, renderer);
     return 0;
 }
