@@ -91,18 +91,15 @@ class MenuButton : public Texture{
 class Background : public Texture{
     public:
         Background(SDL_Renderer* ren, const char* path) : Texture(ren, path) {}
-        void render_background(string blur)
+        void render_background()
         {
             SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 128); // Semi-transparent white
-            for (int i = 0; i < 10; ++i) {
-                SDL_RenderCopy(renderer, texture, NULL, NULL);
-                SDL_RenderFillRect(renderer, NULL);
-            }
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         }
 };
+class Game{
+    public:
+        
+}
 //Level choosing classes
 int main(int argc, char* argv[])
 {
@@ -144,10 +141,20 @@ int main(int argc, char* argv[])
             play_button.render(390, 100, 500, 200);
             quit_button.render(390, 400, 500, 200);
         }else if (game_state == "levels_menu"){
+
             background_menu.render_background();
-            text_choose_levels.render(390, 10, 1000, 200);
-            level_1.render(100, (SCREEN_HEIGHT - 300) / 2, 300, 300);
-            level_2.render(500, (SCREEN_HEIGHT - 300) / 2, 300, 300);
+            int centerX = (SCREEN_WIDTH - 750) / 2;
+            text_choose_levels.render(centerX, 10, 750, 200);
+            int padding = 200;
+            int button_width = 100;
+            int button_height = 110;
+            int total_width = 2 * button_width + padding;
+            int startX = (SCREEN_WIDTH - total_width) / 2;
+            int startY = (SCREEN_HEIGHT - button_height) / 2;
+            level_1.render(startX, startY, button_width, button_height);
+            level_2.render(startX + button_width + padding, startY, button_width, button_height);
+        }else if (game_state == "play"){
+            Game game()
         }
         // Update renderer
         SDL_RenderPresent(renderer);
