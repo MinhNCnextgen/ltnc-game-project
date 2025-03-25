@@ -1,12 +1,18 @@
 #include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
+#include <unordered_map>
+#include <fstream>
+#include <queue>
+#include <string>
 using namespace std;
-
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 const char* WINDOW_TITLE = "Drum it!";
-string game_state = "main_menu";
+const Uint32 FPS = 60;
+const Uint32 frame_delay = 1000/FPS;
+string screen_state = "main_menu";
 
 void logErrorAndExit(const char* msg, const char* error){
     SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "%s: %s", msg, error);
@@ -46,26 +52,29 @@ class Texture {
         SDL_Renderer* renderer;
         SDL_Texture* texture;
         SDL_Rect dest;
-
-        Texture(SDL_Renderer* ren, const char* path) : renderer(ren), texture(NULL){
+        const char* path;
+        Texture(SDL_Renderer* ren, const char* p){
+            path = p;
+            renderer = ren;
             SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Loading %s", path);
             texture = IMG_LoadTexture(renderer, path);
-            if (texture == NULL)
-                SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "Load texture %s", IMG_GetError());
+            if (texture == NULL) {
+                SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "Failed to load texture %s: %s", path, IMG_GetError());
+                exit(1);  // Exit if texture loading fails
+            }
+            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Successfully loaded texture %s", path);
         }
-
         ~Texture(){
             destroy();
         }
-
-        void render(int x, int y, int w, int h){
+        void render(double x, double y, double w, double h){
             dest.x = x;
             dest.y = y;
             dest.w = w;
             dest.h = h;
+            if (texture == NULL) return;
             SDL_RenderCopy(renderer, texture, NULL, &dest);
         }
-
         void destroy(){
             if (texture != NULL){
                 SDL_DestroyTexture(texture);
@@ -73,6 +82,7 @@ class Texture {
             }
         }
 };
+
 //Menu classes
 class MenuButton : public Texture{
     public:
@@ -96,11 +106,104 @@ class Background : public Texture{
             SDL_RenderCopy(renderer, texture, NULL, NULL);
         }
 };
-class Game{
+//Game class
+class GameManager{
     public:
-        
-}
-//Level choosing classes
+        SDL_Renderer* renderer;
+        unordered_map <int, Texture*> textures;
+        struct note {
+            double spawn_time;
+            bool type;
+            Texture* note_mask;          
+            note(double st, bool t, GameManager* gm) : spawn_time(st), type(t) {
+                note_mask = (*gm).getTexture(t ? "assets/play/note_blue.png" : "assets/play/note_orange.png", (*gm).note_list.size());
+            }
+            
+            void spawn() {
+                double x = SCREEN_WIDTH - 100; 
+                double y = (SCREEN_HEIGHT - 100) / 2; 
+                (*note_mask).render(x, y, 100, 100); 
+            }
+            void update_position(double new_x){
+                (*note_mask).render(new_x, (*note_mask).dest.y, (*note_mask).dest.w, (*note_mask).dest.h);
+            }
+        };
+        struct TimeManager{
+            Uint32 start_time; // milisecond 
+            Uint32 current_time; 
+            Uint32 elapsed_time;
+            Uint32 last_frame_time;
+            void update() {
+                current_time = SDL_GetTicks();
+                last_frame_time = current_time - elapsed_time;
+                elapsed_time = current_time - start_time;
+            }
+        };
+        struct StatsManager{
+            int health;
+            int speed; //pixel per second
+            int point;
+            StatsManager(int hp, int spd, int p) : health(hp), speed(spd), point(p) {}
+        };
+        TimeManager game_time;
+        StatsManager game_stats;
+        vector <note> note_list;
+        vector <note*> active_notes;
+        GameManager(SDL_Renderer* ren, string data_path, string music_path) 
+            : renderer(ren), game_stats(100, 1, 0), game_time{SDL_GetTicks(), 0, 0} {
+            ifstream file(data_path);
+            if (!file.is_open()) {
+                cout << "Failed to open data file!" << endl;
+                exit(1);
+            }
+            string line;
+            while (getline(file, line)){
+                string time = "";
+                bool type;
+                for (int i=0;i<line.size();i++){
+                    if (i==0){
+                        type = line[0] - '0';
+                    }
+                    if(i>=2){
+                        time+=line[i];
+                    }
+                }
+                note_list.emplace_back(double(stoi(time) * 1000), type, this);
+            }
+            file.close();
+            game_time.start_time = SDL_GetTicks();
+            game_time.update();
+        }
+        ~GameManager() {
+            for (auto& pair : textures) {
+                delete pair.second;
+            }
+        }
+        Texture* getTexture(const char* path, int note_index) {
+            if (textures.find(note_index) == textures.end()) {
+                textures[note_index] = new Texture(renderer, path);
+            }
+            return textures[note_index];
+        }
+        void game_update(){
+            game_time.update();
+            if (!note_list.empty()){
+                note& curr_note = note_list.at(active_notes.size());
+                if (game_time.elapsed_time>=curr_note.spawn_time){
+                    curr_note.spawn();
+                    active_notes.push_back(&curr_note);
+                }
+            }
+            if (!active_notes.empty()){
+                for (note* note_ptr : active_notes) {
+                    double x_pos = (*(*note_ptr).note_mask).dest.x - (game_stats.speed*(game_time.last_frame_time/100));
+                    (*note_ptr).update_position(x_pos);
+                }
+            }
+        }
+};
+
+//Main
 int main(int argc, char* argv[])
 {
     //Init
@@ -115,19 +218,26 @@ int main(int argc, char* argv[])
     Texture text_choose_levels(renderer, "assets/menu/choose_levels.png");
     MenuButton level_1(renderer, "assets/menu/lvl1.png", "lvl_1");
     MenuButton level_2(renderer, "assets/menu/lvl2.png", "lvl_2");
+    //Play 
+    GameManager game(renderer, "data/1.txt", "sfx/lvl1.mp3");
+    cout << "First note type: " << game.note_list[0].type << endl;
     //Game loop
     bool running = true;
+    Uint32 frame_start, frame_time;
     SDL_Event event;
     while (running) {
+        frame_start = SDL_GetTicks();
         while (SDL_PollEvent(&event)) {
             switch (event.type){
                 case SDL_QUIT:
                     running = false;
                     break;
                 case SDL_MOUSEBUTTONDOWN:
-                    if (game_state == "main_menu"){
-                        if (play_button.is_hovering()) game_state = "levels_menu";
+                    if (screen_state == "main_menu"){
+                        if (play_button.is_hovering()) screen_state = "levels_menu";
                         if (quit_button.is_hovering()) running = false;
+                    }else if(screen_state == "levels_menu"){
+                        if (level_1.is_hovering()) screen_state = "play";
                     }
                     break;
             }
@@ -136,28 +246,26 @@ int main(int argc, char* argv[])
         // Clear renderer
         SDL_RenderClear(renderer);
         // Render textures
-        if (game_state == "main_menu"){
+        if (screen_state == "main_menu"){
             background_menu.render_background();
             play_button.render(390, 100, 500, 200);
             quit_button.render(390, 400, 500, 200);
-        }else if (game_state == "levels_menu"){
-
+        }else if (screen_state == "levels_menu"){
             background_menu.render_background();
-            int centerX = (SCREEN_WIDTH - 750) / 2;
-            text_choose_levels.render(centerX, 10, 750, 200);
-            int padding = 200;
-            int button_width = 100;
-            int button_height = 110;
-            int total_width = 2 * button_width + padding;
-            int startX = (SCREEN_WIDTH - total_width) / 2;
-            int startY = (SCREEN_HEIGHT - button_height) / 2;
-            level_1.render(startX, startY, button_width, button_height);
-            level_2.render(startX + button_width + padding, startY, button_width, button_height);
-        }else if (game_state == "play"){
-            Game game()
+            text_choose_levels.render((SCREEN_WIDTH - 400) / 2, 50, 400, 100);
+            level_1.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2, (SCREEN_HEIGHT - 110) / 2, 100, 110);
+            level_2.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2 + 100 + 200, (SCREEN_HEIGHT - 110) / 2, 100, 110);
+        }
+        else if (screen_state == "play"){
+            background_menu.render_background();
+            game.game_update();
         }
         // Update renderer
         SDL_RenderPresent(renderer);
+        frame_time = SDL_GetTicks() - frame_start;
+        if (frame_delay > frame_time){
+            SDL_Delay(frame_delay - frame_time);
+        }
     }
     quitSDL(window, renderer);
     return 0;
