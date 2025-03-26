@@ -72,7 +72,6 @@ class Texture {
             dest.y = y;
             dest.w = w;
             dest.h = h;
-            if (texture == NULL) return;
             SDL_RenderCopy(renderer, texture, NULL, &dest);
         }
         void destroy(){
@@ -111,21 +110,44 @@ class GameManager{
     public:
         SDL_Renderer* renderer;
         unordered_map <int, Texture*> textures;
-        struct note {
+        struct Note {
             double spawn_time;
             bool type;
-            Texture* note_mask;          
-            note(double st, bool t, GameManager* gm) : spawn_time(st), type(t) {
+            Texture* note_mask;
+            double x_pos;
+            double y_pos;
+            double width;
+            double height;
+            
+            Note(double st, bool t, GameManager* gm) : spawn_time(st), type(t) {
                 note_mask = (*gm).getTexture(t ? "assets/play/note_blue.png" : "assets/play/note_orange.png", (*gm).note_list.size());
+                width = 100;
+                height = 100;
+                x_pos = SCREEN_WIDTH + 200;
+                y_pos = (SCREEN_HEIGHT - height) / 2;
             }
             
             void spawn() {
-                double x = SCREEN_WIDTH - 100; 
-                double y = (SCREEN_HEIGHT - 100) / 2; 
-                (*note_mask).render(x, y, 100, 100); 
+                (*note_mask).render(x_pos, y_pos, width, height);
             }
-            void update_position(double new_x){
-                (*note_mask).render(new_x, (*note_mask).dest.y, (*note_mask).dest.w, (*note_mask).dest.h);
+            
+            void update_position(double new_x) {
+                x_pos = new_x;
+                (*note_mask).render(x_pos, y_pos, width, height);
+            }
+        };
+        struct HitBox{
+            Texture *hitbox_mask;
+            int width, height, x_pos, y_pos;
+            HitBox(GameManager* gm){
+                width = 100;
+                height = 100;
+                x_pos = 100;
+                y_pos = (SCREEN_HEIGHT - height) / 2;
+                hitbox_mask = new Texture((*gm).renderer, "assets/play/hitbox.png");
+            }
+            void render_hitbox(){
+                (*hitbox_mask).render(x_pos, y_pos, width, height);
             }
         };
         struct TimeManager{
@@ -137,20 +159,23 @@ class GameManager{
                 current_time = SDL_GetTicks();
                 last_frame_time = current_time - elapsed_time;
                 elapsed_time = current_time - start_time;
+                if (last_frame_time > 100) last_frame_time = 100; // Cap frame time to prevent huge jumps
             }
         };
         struct StatsManager{
             int health;
             int speed; //pixel per second
             int point;
-            StatsManager(int hp, int spd, int p) : health(hp), speed(spd), point(p) {}
+            StatsManager() : health(100), speed(1), point(0) {}  // Default constructor
+            StatsManager(int hp, int spd, int p) : health(hp), speed(spd), point(p) {}  // Constructor with parameters
         };
         TimeManager game_time;
         StatsManager game_stats;
-        vector <note> note_list;
-        vector <note*> active_notes;
+        HitBox hit_box{this};
+        vector <Note> note_list;
+        vector <Note*> active_notes;
         GameManager(SDL_Renderer* ren, string data_path, string music_path) 
-            : renderer(ren), game_stats(100, 1, 0), game_time{SDL_GetTicks(), 0, 0} {
+            : renderer(ren), game_stats(100, 10, 0), game_time{SDL_GetTicks(), 0, 0} {
             ifstream file(data_path);
             if (!file.is_open()) {
                 cout << "Failed to open data file!" << endl;
@@ -187,17 +212,20 @@ class GameManager{
         }
         void game_update(){
             game_time.update();
-            if (!note_list.empty()){
-                note& curr_note = note_list.at(active_notes.size());
-                if (game_time.elapsed_time>=curr_note.spawn_time){
+            hit_box.render_hitbox();
+            // Spawn new notes
+            if (!note_list.empty() && active_notes.size() < note_list.size()){
+                Note& curr_note = note_list[active_notes.size()];
+                if (game_time.elapsed_time >= curr_note.spawn_time){
                     curr_note.spawn();
                     active_notes.push_back(&curr_note);
                 }
             }
+            // Update existing notes
             if (!active_notes.empty()){
-                for (note* note_ptr : active_notes) {
-                    double x_pos = (*(*note_ptr).note_mask).dest.x - (game_stats.speed*(game_time.last_frame_time/100));
-                    (*note_ptr).update_position(x_pos);
+                for (Note* note_ptr : active_notes) {
+                    double new_x = (*note_ptr).x_pos - (game_stats.speed * (game_time.last_frame_time/100));
+                    (*note_ptr).update_position(new_x);
                 }
             }
         }
@@ -219,10 +247,10 @@ int main(int argc, char* argv[])
     MenuButton level_1(renderer, "assets/menu/lvl1.png", "lvl_1");
     MenuButton level_2(renderer, "assets/menu/lvl2.png", "lvl_2");
     //Play 
-    GameManager game(renderer, "data/1.txt", "sfx/lvl1.mp3");
-    cout << "First note type: " << game.note_list[0].type << endl;
+    GameManager* game = nullptr;  // Change to pointer and initialize as nullptr
     //Game loop
     bool running = true;
+    bool in_game = false;
     Uint32 frame_start, frame_time;
     SDL_Event event;
     while (running) {
@@ -237,11 +265,13 @@ int main(int argc, char* argv[])
                         if (play_button.is_hovering()) screen_state = "levels_menu";
                         if (quit_button.is_hovering()) running = false;
                     }else if(screen_state == "levels_menu"){
-                        if (level_1.is_hovering()) screen_state = "play";
+                        if (level_1.is_hovering()) {
+                            screen_state = "play";
+                            in_game = false;  // Reset in_game flag when starting new game
+                        }
                     }
                     break;
             }
-
         }
         // Clear renderer
         SDL_RenderClear(renderer);
@@ -258,7 +288,15 @@ int main(int argc, char* argv[])
         }
         else if (screen_state == "play"){
             background_menu.render_background();
-            game.game_update();
+            if (!in_game){
+                if (game != nullptr) {
+                    delete game;
+                }
+                game = new GameManager(renderer, "data/1.txt", "sfx/lvl1.mp3");
+                in_game = true;
+            }else if (game != nullptr){
+                (*game).game_update();
+            }
         }
         // Update renderer
         SDL_RenderPresent(renderer);
@@ -266,6 +304,10 @@ int main(int argc, char* argv[])
         if (frame_delay > frame_time){
             SDL_Delay(frame_delay - frame_time);
         }
+    }
+    // Clean up game instance before quitting
+    if (game != nullptr) {
+        delete game;
     }
     quitSDL(window, renderer);
     return 0;
