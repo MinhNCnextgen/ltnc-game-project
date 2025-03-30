@@ -1,0 +1,6 @@
+- note speed, note spawn time system.
+- Sound and syncronization.
+- Collision and Point system.
+- End screen and return to level choosing screen.
+- Add more beat maps.
+- Code refactor 

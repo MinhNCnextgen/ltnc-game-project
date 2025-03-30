@@ -56,18 +56,18 @@ class Texture {
         Texture(SDL_Renderer* ren, const char* p){
             path = p;
             renderer = ren;
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Loading %s", path);
+            // SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Loading %s", path);
             texture = IMG_LoadTexture(renderer, path);
             if (texture == NULL) {
                 SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "Failed to load texture %s: %s", path, IMG_GetError());
                 exit(1);  // Exit if texture loading fails
             }
-            SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Successfully loaded texture %s", path);
+            // SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO, "Successfully loaded texture %s", path);
         }
         ~Texture(){
             destroy();
         }
-        void render(double x, double y, double w, double h){
+        void render(float x, float y, float w, float h){
             dest.x = x;
             dest.y = y;
             dest.w = w;
@@ -111,19 +111,22 @@ class GameManager{
         SDL_Renderer* renderer;
         unordered_map <int, Texture*> textures;
         struct Note {
-            double spawn_time;
+            float spawn_time;
             bool type;
             Texture* note_mask;
-            double x_pos;
-            double y_pos;
-            double width;
-            double height;
+            float x_pos;
+            float y_pos;
+            float width;
+            float height;
             
-            Note(double st, bool t, GameManager* gm) : spawn_time(st), type(t) {
-                note_mask = (*gm).getTexture(t ? "assets/play/note_blue.png" : "assets/play/note_orange.png", (*gm).note_list.size());
+            Note(float st, bool t, GameManager* gm) : spawn_time(st), type(t) {
+                note_mask = (*gm).get_note_texture(t ? "assets/play/note_blue.png" : "assets/play/note_orange.png", (*gm).note_list.size());
                 width = 100;
                 height = 100;
-                x_pos = SCREEN_WIDTH + 200;
+                x_pos = SCREEN_WIDTH + 200;  
+                if (spawn_time < 0){
+                    x_pos -= (*gm).game_stats.speed * (-spawn_time / 1000.0f);
+                }
                 y_pos = (SCREEN_HEIGHT - height) / 2;
             }
             
@@ -131,8 +134,9 @@ class GameManager{
                 (*note_mask).render(x_pos, y_pos, width, height);
             }
             
-            void update_position(double new_x) {
+            void update_position(float new_x) {
                 x_pos = new_x;
+                cout<<x_pos<<endl;
                 (*note_mask).render(x_pos, y_pos, width, height);
             }
         };
@@ -152,22 +156,31 @@ class GameManager{
         };
         struct TimeManager{
             Uint32 start_time; // milisecond 
+            Uint32 previous_time;
             Uint32 current_time; 
             Uint32 elapsed_time;
             Uint32 last_frame_time;
             void update() {
+                previous_time = current_time;  // Store previous time
                 current_time = SDL_GetTicks();
-                last_frame_time = current_time - elapsed_time;
                 elapsed_time = current_time - start_time;
-                if (last_frame_time > 100) last_frame_time = 100; // Cap frame time to prevent huge jumps
+                last_frame_time = current_time - previous_time;  // Correct delta time
+                if (last_frame_time > FPS) last_frame_time = FPS;
+            }
+            void start_timer() {
+                Uint32 current_ticks = SDL_GetTicks();
+                start_time = current_ticks;
+                previous_time = current_ticks;
+                current_time = current_ticks;
+                elapsed_time = 0;
+                last_frame_time = 0;
             }
         };
         struct StatsManager{
             int health;
-            int speed; //pixel per second
+            float speed; //pixel per second
             int point;
-            StatsManager() : health(100), speed(1), point(0) {}  // Default constructor
-            StatsManager(int hp, int spd, int p) : health(hp), speed(spd), point(p) {}  // Constructor with parameters
+            StatsManager(int hp, float spd, int p) : health(hp), speed(spd), point(p) {}  // Constructor with parameters
         };
         TimeManager game_time;
         StatsManager game_stats;
@@ -175,7 +188,7 @@ class GameManager{
         vector <Note> note_list;
         vector <Note*> active_notes;
         GameManager(SDL_Renderer* ren, string data_path, string music_path) 
-            : renderer(ren), game_stats(100, 10, 0), game_time{SDL_GetTicks(), 0, 0} {
+            : renderer(ren), game_stats(100, 200, 0) {
             ifstream file(data_path);
             if (!file.is_open()) {
                 cout << "Failed to open data file!" << endl;
@@ -192,19 +205,19 @@ class GameManager{
                     if(i>=2){
                         time+=line[i];
                     }
-                }
-                note_list.emplace_back(double(stoi(time) * 1000), type, this);
+                } 
+                note_list.emplace_back(calculate_spawn_time(stof(time)*1000.0f), type, this); 
             }
             file.close();
-            game_time.start_time = SDL_GetTicks();
-            game_time.update();
+            game_time.start_timer();
+
         }
         ~GameManager() {
             for (auto& pair : textures) {
                 delete pair.second;
             }
         }
-        Texture* getTexture(const char* path, int note_index) {
+        Texture* get_note_texture(const char* path, int note_index) {
             if (textures.find(note_index) == textures.end()) {
                 textures[note_index] = new Texture(renderer, path);
             }
@@ -216,18 +229,24 @@ class GameManager{
             // Spawn new notes
             if (!note_list.empty() && active_notes.size() < note_list.size()){
                 Note& curr_note = note_list[active_notes.size()];
-                if (game_time.elapsed_time >= curr_note.spawn_time){
-                    curr_note.spawn();
-                    active_notes.push_back(&curr_note);
+                if (game_time.elapsed_time >= curr_note.spawn_time) {
+                        curr_note.spawn();
+                        active_notes.push_back(&curr_note);
                 }
             }
             // Update existing notes
             if (!active_notes.empty()){
-                for (Note* note_ptr : active_notes) {
-                    double new_x = (*note_ptr).x_pos - (game_stats.speed * (game_time.last_frame_time/100));
+                float new_x;
+                for (Note* note_ptr : active_notes) { 
+                    new_x = (*note_ptr).x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
                     (*note_ptr).update_position(new_x);
                 }
             }
+        }
+        float calculate_spawn_time(float hit_time){
+            float distance = SCREEN_WIDTH + 100.0f;  
+            float time_needed = (distance / game_stats.speed) * 1000.0f;
+            return hit_time - time_needed;
         }
 };
 
@@ -247,7 +266,7 @@ int main(int argc, char* argv[])
     MenuButton level_1(renderer, "assets/menu/lvl1.png", "lvl_1");
     MenuButton level_2(renderer, "assets/menu/lvl2.png", "lvl_2");
     //Play 
-    GameManager* game = nullptr;  // Change to pointer and initialize as nullptr
+    GameManager* game = nullptr; 
     //Game loop
     bool running = true;
     bool in_game = false;
@@ -267,7 +286,11 @@ int main(int argc, char* argv[])
                     }else if(screen_state == "levels_menu"){
                         if (level_1.is_hovering()) {
                             screen_state = "play";
-                            in_game = false;  // Reset in_game flag when starting new game
+                            in_game = false;
+                            if (game != nullptr) delete game;
+                            game = new GameManager(renderer, "data/1.txt", "sfx/lvl1.mp3");
+                            game->game_time.start_timer();
+                            in_game = true;
                         }
                     }
                     break;
@@ -284,28 +307,22 @@ int main(int argc, char* argv[])
             background_menu.render_background();
             text_choose_levels.render((SCREEN_WIDTH - 400) / 2, 50, 400, 100);
             level_1.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2, (SCREEN_HEIGHT - 110) / 2, 100, 110);
+
             level_2.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2 + 100 + 200, (SCREEN_HEIGHT - 110) / 2, 100, 110);
         }
         else if (screen_state == "play"){
             background_menu.render_background();
-            if (!in_game){
-                if (game != nullptr) {
-                    delete game;
-                }
-                game = new GameManager(renderer, "data/1.txt", "sfx/lvl1.mp3");
-                in_game = true;
-            }else if (game != nullptr){
-                (*game).game_update();
-            }
+            (*game).game_update();
         }
         // Update renderer
         SDL_RenderPresent(renderer);
+        //Limit frame speed
         frame_time = SDL_GetTicks() - frame_start;
         if (frame_delay > frame_time){
             SDL_Delay(frame_delay - frame_time);
         }
     }
-    // Clean up game instance before quitting
+    // Clean up 
     if (game != nullptr) {
         delete game;
     }
