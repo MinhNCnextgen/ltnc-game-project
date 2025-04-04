@@ -2,9 +2,9 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_ttf.h>
 #include <unordered_map>
 #include <fstream>
-#include <algorithm>
 #include <vector>
 #include <string>
 using namespace std;
@@ -24,6 +24,7 @@ SDL_Window* initSDL(int SCREEN_WIDTH, int SCREEN_HEIGHT, const char* WINDOW_TITL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) logErrorAndExit("SDL_Init", SDL_GetError());
     SDL_Window* window = SDL_CreateWindow(WINDOW_TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     if (window == nullptr) logErrorAndExit("CreateWindow", SDL_GetError());
+    TTF_Init();
     if (!IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG)) logErrorAndExit("SDL_image error:", IMG_GetError());
     return window;
 }
@@ -124,9 +125,9 @@ class GameManager{
             
             Note(float ht, float st, bool t, int indx, GameManager* gm) :hit_time(ht), spawn_time(st), type(t), index(indx) {
                 note_mask = (*gm).get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size());
-                width = 100;
-                height = 100;
-                x_pos = SCREEN_WIDTH + 200;  
+                width = 150;
+                height = 150;
+                x_pos = SCREEN_WIDTH + 300;  
                 if (spawn_time < 0){
                     x_pos -= (*gm).game_stats.speed * (-spawn_time / 1000.0f);
                 }
@@ -174,7 +175,8 @@ class GameManager{
             float speed; //pixel per second
             int point;
             int multiplier;
-            StatsManager(float spd) : health(5), speed(spd), point(0), multiplier(1) {}  // Constructor with parameters
+            const char* last_note_score;
+            StatsManager(float spd) : health(5), speed(spd), point(0), multiplier(1), last_note_score("") {} 
 
         };
         struct KeyManager{
@@ -240,13 +242,16 @@ class GameManager{
                     if(i>=2){
                         time+=line[i];
                     }
-                } 
-                note_list.emplace_back(stof(time)*1000.0f, calculate_spawn_time(stof(time)*1000.0f), type, count, this); 
+                }
+                float hit_time = stof(time)*1000.0f;
+                float distance = SCREEN_WIDTH + 100.0f;
+                float time_needed = (distance / game_stats.speed) * 1000.0f;
+                float spawn_time = hit_time - time_needed;
+                note_list.emplace_back(hit_time, spawn_time, type, count, this); 
                 count++;
             }
             file.close();
             game_time.start_timer();
-
         }
         ~GameManager() {
             for (auto& pair : textures) {
@@ -275,11 +280,12 @@ class GameManager{
                 float new_x;
                 for (auto it = active_notes.begin(); it != active_notes.end();) { 
                     new_x = (*it)->x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
-                    if (new_x < 0){
+                    if (new_x < -200){
                         (*it)->delete_note(this);
                         it = active_notes.erase(it);
                         game_stats.multiplier = 1;
                         game_stats.health-=1;
+                        game_stats.last_note_score = "Missed";
                     } else {
                         (*it)->update_position(new_x);
                         ++it;
@@ -308,45 +314,82 @@ class GameManager{
             }
             key_press.key_update();
         }
-        float calculate_spawn_time(float hit_time){
-            float distance = SCREEN_WIDTH + 100.0f;  
-            float time_needed = (distance / game_stats.speed) * 1000.0f;
-            return hit_time - time_needed;
-        }
         void update_point(float gap){
             if (gap<=500 && gap >= 300){
                 game_stats.multiplier = 1;
                 game_stats.health-=1;
-                cout<<"Miss!"<<endl;
+                game_stats.last_note_score = "Missed";
             }else if(gap<300 && gap>=200){
                 game_stats.point+= 50 * game_stats.multiplier;
                 game_stats.multiplier++;
-                cout<<"Ok"<<endl;
+                game_stats.last_note_score = "Ok";
             }else if(gap<200 && gap>=60){
                 game_stats.point+= 100 * game_stats.multiplier;
                 game_stats.multiplier++;
-                cout<<"Great"<<endl;
+                game_stats.last_note_score = "Great";
             }else if(gap<60 && gap>=-30){
                 game_stats.point+= 300 * game_stats.multiplier;
                 game_stats.multiplier++;
-                cout<<"Excellent"<<endl;
+                game_stats.last_note_score = "Excellent";
             }else if (gap<-30 && gap>=-70){
                 game_stats.point+= 100 * game_stats.multiplier;
                 game_stats.multiplier++;
-                cout<<"Great"<<endl;
+                game_stats.last_note_score = "Great";
             }else if (gap<-70 && gap>=-100){
                 game_stats.point+= 50 * game_stats.multiplier;
                 game_stats.multiplier++;
-                cout<<"Ok"<<endl;
+                game_stats.last_note_score = "Ok";
             }else{
                 game_stats.multiplier = 1;
                 game_stats.health-=1;
-                cout<<"Miss"<<endl;
+                game_stats.last_note_score = "Missed";
             }
-            cout<<"Current points: "<<game_stats.point<<" Current multipliers "<<game_stats.multiplier<<endl;
         }
 };
-
+class Text{
+    public:
+        TTF_Font* font;
+        SDL_Color text_color;
+        SDL_Surface* text_surface;
+        SDL_Renderer* renderer;
+        SDL_Texture* text_texture;
+        SDL_Rect dest;
+        const char* message;
+        int font_size;
+        Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg) : renderer(ren), message(msg.c_str()), font_size(f_size){
+            if (msg_color == "Black") {
+                text_color = {0, 0, 0, 255}; 
+            } else if (msg_color == "White") {
+                text_color = {255, 255, 255, 255};
+            } else {
+                text_color = {255, 0, 0, 255};
+            }
+            font = TTF_OpenFont(font_path, font_size);
+            text_surface = TTF_RenderText_Blended(font, message, text_color);
+            text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+        }
+        void render(float x, float y, float width, float height,const char* new_message){
+            int textWidth, textHeight;
+            SDL_QueryTexture(text_texture, NULL, NULL, &textWidth, &textHeight);
+            dest.x = x;
+            dest.y = y;
+            dest.w = textWidth;
+            dest.h = textHeight;
+            if (new_message){
+                SDL_DestroyTexture(text_texture);
+                SDL_FreeSurface(text_surface);
+                message = new_message;
+                text_surface = TTF_RenderText_Blended(font, message, text_color);
+                text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+            }
+            SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+        }
+        ~Text(){
+            SDL_DestroyTexture(text_texture);
+            SDL_FreeSurface(text_surface);
+            TTF_CloseFont(font);
+        }
+};
 //Main
 int main(int argc, char* argv[])
 {
@@ -363,7 +406,13 @@ int main(int argc, char* argv[])
     MenuButton level_1(renderer, "assets/menu/lvl1.png", "lvl_1");
     MenuButton level_2(renderer, "assets/menu/lvl2.png", "lvl_2");
     //Play
+    Texture drum(renderer, "assets/play/drum.png");
     Texture hit_box(renderer, "assets/play/hitbox.png");
+    Texture lane(renderer, "assets/play/lane.png");
+    Text score(renderer, "font/Aller_bd.ttf", 54, "Black", "");
+    Text streak(renderer, "font/Aller_bd.ttf", 54, "Black", "");
+    Text note_score(renderer, "font/Aller_bd.ttf", 34, "Black", "");
+    Text health(renderer, "font/Aller_bd.ttf", 54, "Black", "");
     GameManager* game = nullptr; 
     //Game loop
     bool running = true;
@@ -384,7 +433,6 @@ int main(int argc, char* argv[])
                     }else if(screen_state == "levels_menu"){
                         if (level_1.is_hovering()) {
                             screen_state = "play";
-                            in_game = false;
                             if (game != nullptr) delete game;
                             game = new GameManager(renderer, "data/1.txt", "sfx/lvl1.mp3");
                             game->game_time.start_timer();
@@ -427,17 +475,23 @@ int main(int argc, char* argv[])
             background_menu.render_background();
             play_button.render(390, 100, 500, 200);
             quit_button.render(390, 400, 500, 200);
+
         }else if (screen_state == "levels_menu"){
             background_menu.render_background();
             text_choose_levels.render((SCREEN_WIDTH - 400) / 2, 50, 400, 100);
             level_1.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2, (SCREEN_HEIGHT - 110) / 2, 100, 110);
-
             level_2.render((SCREEN_WIDTH - (2 * 100 + 200)) / 2 + 100 + 200, (SCREEN_HEIGHT - 110) / 2, 100, 110);
         }
         else if (screen_state == "play"){
             background_menu.render_background();
-            hit_box.render(100,(SCREEN_HEIGHT - 100) / 2,100,100);
-            (*game).game_update();
+            lane.render(0, (SCREEN_HEIGHT - 175) / 2, SCREEN_WIDTH, 235);
+            drum.render(50, (SCREEN_HEIGHT - 150) / 2, 150, 150);
+            hit_box.render(200,(SCREEN_HEIGHT - 150) / 2,150,150);
+            game->game_update();
+            score.render(10, 10, 300, 50, ("Score: " + to_string(game->game_stats.point)).c_str());
+            streak.render(10, 70, 50, 50, ("x" + to_string(game->game_stats.multiplier-1)).c_str());
+            note_score.render(10, 130, 150, 50, (game->game_stats.last_note_score));
+            health.render(SCREEN_WIDTH - 300, 10, 150, 50, ("Health: " + to_string(game->game_stats.health)).c_str());
         }
         // Update renderer
         SDL_RenderPresent(renderer);
