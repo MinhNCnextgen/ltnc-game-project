@@ -4,7 +4,8 @@
 #include <SDL2/SDL_mixer.h>
 #include <unordered_map>
 #include <fstream>
-#include <queue>
+#include <algorithm>
+#include <vector>
 #include <string>
 using namespace std;
 const int SCREEN_WIDTH = 1280;
@@ -112,15 +113,17 @@ class GameManager{
         unordered_map <int, Texture*> textures;
         struct Note {
             float spawn_time;
+            float hit_time;
             bool type;
+            int index;
             Texture* note_mask;
             float x_pos;
             float y_pos;
             float width;
             float height;
             
-            Note(float st, bool t, GameManager* gm) : spawn_time(st), type(t) {
-                note_mask = (*gm).get_note_texture(t ? "assets/play/note_blue.png" : "assets/play/note_orange.png", (*gm).note_list.size());
+            Note(float ht, float st, bool t, int indx, GameManager* gm) :hit_time(ht), spawn_time(st), type(t), index(indx) {
+                note_mask = (*gm).get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size());
                 width = 100;
                 height = 100;
                 x_pos = SCREEN_WIDTH + 200;  
@@ -136,22 +139,12 @@ class GameManager{
             
             void update_position(float new_x) {
                 x_pos = new_x;
-                cout<<x_pos<<endl;
                 (*note_mask).render(x_pos, y_pos, width, height);
             }
-        };
-        struct HitBox{
-            Texture *hitbox_mask;
-            int width, height, x_pos, y_pos;
-            HitBox(GameManager* gm){
-                width = 100;
-                height = 100;
-                x_pos = 100;
-                y_pos = (SCREEN_HEIGHT - height) / 2;
-                hitbox_mask = new Texture((*gm).renderer, "assets/play/hitbox.png");
-            }
-            void render_hitbox(){
-                (*hitbox_mask).render(x_pos, y_pos, width, height);
+            void delete_note(GameManager* gm){
+                note_mask = NULL;
+                delete gm->textures[index];
+                gm->textures.erase(index);
             }
         };
         struct TimeManager{
@@ -161,10 +154,10 @@ class GameManager{
             Uint32 elapsed_time;
             Uint32 last_frame_time;
             void update() {
-                previous_time = current_time;  // Store previous time
+                previous_time = current_time; 
                 current_time = SDL_GetTicks();
                 elapsed_time = current_time - start_time;
-                last_frame_time = current_time - previous_time;  // Correct delta time
+                last_frame_time = current_time - previous_time;  
                 if (last_frame_time > FPS) last_frame_time = FPS;
             }
             void start_timer() {
@@ -180,21 +173,63 @@ class GameManager{
             int health;
             float speed; //pixel per second
             int point;
-            StatsManager(int hp, float spd, int p) : health(hp), speed(spd), point(p) {}  // Constructor with parameters
+            int multiplier;
+            StatsManager(float spd) : health(5), speed(spd), point(0), multiplier(1) {}  // Constructor with parameters
+
         };
+        struct KeyManager{
+            bool key_blue;
+            bool key_orange;
+            bool is_holding;
+            Uint32 press_time;
+            Uint32 time_held;
+            KeyManager(){
+                reset();
+            }
+            void reset(){
+                key_blue = 0;
+                key_orange = 0;
+                is_holding = false;
+                time_held = 0;
+                press_time = 0;
+            }
+            void key_down_blue(){
+                if (!is_holding) press_time = SDL_GetTicks();
+                if (time_held == 0) key_blue = 1;
+                else key_blue = 0;
+                is_holding = true;
+            }
+            void key_down_orange(){
+                if (!is_holding) press_time = SDL_GetTicks();
+                if (time_held == 0) key_orange = 1;
+                else key_orange = 0;
+                is_holding = true;
+            }
+            void key_update(){
+                if (is_holding) {
+                    time_held = SDL_GetTicks() - press_time;
+                    if (time_held > 0) {
+                        key_blue = 0;
+                        key_orange = 0;
+                    }
+                }
+            }
+        };
+        KeyManager key_press;
         TimeManager game_time;
         StatsManager game_stats;
-        HitBox hit_box{this};
         vector <Note> note_list;
         vector <Note*> active_notes;
+        size_t next_note_index;
         GameManager(SDL_Renderer* ren, string data_path, string music_path) 
-            : renderer(ren), game_stats(100, 200, 0) {
+            : renderer(ren), game_stats(350), next_note_index(0) {
             ifstream file(data_path);
             if (!file.is_open()) {
                 cout << "Failed to open data file!" << endl;
                 exit(1);
             }
             string line;
+            int count = 0;
             while (getline(file, line)){
                 string time = "";
                 bool type;
@@ -206,7 +241,8 @@ class GameManager{
                         time+=line[i];
                     }
                 } 
-                note_list.emplace_back(calculate_spawn_time(stof(time)*1000.0f), type, this); 
+                note_list.emplace_back(stof(time)*1000.0f, calculate_spawn_time(stof(time)*1000.0f), type, count, this); 
+                count++;
             }
             file.close();
             game_time.start_timer();
@@ -225,28 +261,89 @@ class GameManager{
         }
         void game_update(){
             game_time.update();
-            hit_box.render_hitbox();
             // Spawn new notes
-            if (!note_list.empty() && active_notes.size() < note_list.size()){
-                Note& curr_note = note_list[active_notes.size()];
+            if (!note_list.empty() && next_note_index < note_list.size()){
+                Note& curr_note = note_list[next_note_index];
                 if (game_time.elapsed_time >= curr_note.spawn_time) {
-                        curr_note.spawn();
-                        active_notes.push_back(&curr_note);
+                    curr_note.spawn();
+                    active_notes.push_back(&curr_note);
+                    next_note_index++;
                 }
             }
             // Update existing notes
             if (!active_notes.empty()){
                 float new_x;
-                for (Note* note_ptr : active_notes) { 
-                    new_x = (*note_ptr).x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
-                    (*note_ptr).update_position(new_x);
+                for (auto it = active_notes.begin(); it != active_notes.end();) { 
+                    new_x = (*it)->x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
+                    if (new_x < 0){
+                        (*it)->delete_note(this);
+                        it = active_notes.erase(it);
+                        game_stats.multiplier = 1;
+                        game_stats.health-=1;
+                    } else {
+                        (*it)->update_position(new_x);
+                        ++it;
+                    }
                 }
             }
+            // Check if note hit
+            if (!active_notes.empty()){
+                Note* front_note = active_notes.front();
+                float error_gap = front_note->hit_time - game_time.elapsed_time;
+                if (key_press.key_blue && front_note->type == 0){
+                    if(error_gap <= 500){
+                        update_point(error_gap);
+                        cout<<"Note blue hit!"<<endl;
+                        front_note->delete_note(this);
+                        active_notes.erase(active_notes.begin());
+                    }
+                }else if (key_press.key_orange && front_note->type == 1){
+                    if(error_gap <= 500){
+                        update_point(error_gap);
+                        cout<<"Note orange hit!"<<endl;
+                        front_note->delete_note(this);
+                        active_notes.erase(active_notes.begin());
+                    }
+                }
+            }
+            key_press.key_update();
         }
         float calculate_spawn_time(float hit_time){
             float distance = SCREEN_WIDTH + 100.0f;  
             float time_needed = (distance / game_stats.speed) * 1000.0f;
             return hit_time - time_needed;
+        }
+        void update_point(float gap){
+            if (gap<=500 && gap >= 300){
+                game_stats.multiplier = 1;
+                game_stats.health-=1;
+                cout<<"Miss!"<<endl;
+            }else if(gap<300 && gap>=200){
+                game_stats.point+= 50 * game_stats.multiplier;
+                game_stats.multiplier++;
+                cout<<"Ok"<<endl;
+            }else if(gap<200 && gap>=60){
+                game_stats.point+= 100 * game_stats.multiplier;
+                game_stats.multiplier++;
+                cout<<"Great"<<endl;
+            }else if(gap<60 && gap>=-30){
+                game_stats.point+= 300 * game_stats.multiplier;
+                game_stats.multiplier++;
+                cout<<"Excellent"<<endl;
+            }else if (gap<-30 && gap>=-70){
+                game_stats.point+= 100 * game_stats.multiplier;
+                game_stats.multiplier++;
+                cout<<"Great"<<endl;
+            }else if (gap<-70 && gap>=-100){
+                game_stats.point+= 50 * game_stats.multiplier;
+                game_stats.multiplier++;
+                cout<<"Ok"<<endl;
+            }else{
+                game_stats.multiplier = 1;
+                game_stats.health-=1;
+                cout<<"Miss"<<endl;
+            }
+            cout<<"Current points: "<<game_stats.point<<" Current multipliers "<<game_stats.multiplier<<endl;
         }
 };
 
@@ -265,7 +362,8 @@ int main(int argc, char* argv[])
     Texture text_choose_levels(renderer, "assets/menu/choose_levels.png");
     MenuButton level_1(renderer, "assets/menu/lvl1.png", "lvl_1");
     MenuButton level_2(renderer, "assets/menu/lvl2.png", "lvl_2");
-    //Play 
+    //Play
+    Texture hit_box(renderer, "assets/play/hitbox.png");
     GameManager* game = nullptr; 
     //Game loop
     bool running = true;
@@ -294,6 +392,32 @@ int main(int argc, char* argv[])
                         }
                     }
                     break;
+                case SDL_KEYDOWN:
+                    if (screen_state == "play" && game){
+                        switch (event.key.keysym.sym)
+                        {
+                        case SDLK_f:
+                            game->key_press.key_down_blue();
+                            break;
+                        case SDLK_j:
+                            game->key_press.key_down_orange();
+                            break;
+                        }
+                    }
+                    break;
+                case SDL_KEYUP:
+                    if (screen_state == "play" && game){
+                        switch (event.key.keysym.sym)
+                        {
+                        case SDLK_f:
+                            game->key_press.reset();
+                            break;
+                        case SDLK_j:
+                            game->key_press.reset();
+                            break;
+                        }
+                    }
+                    break;
             }
         }
         // Clear renderer
@@ -312,6 +436,7 @@ int main(int argc, char* argv[])
         }
         else if (screen_state == "play"){
             background_menu.render_background();
+            hit_box.render(100,(SCREEN_HEIGHT - 100) / 2,100,100);
             (*game).game_update();
         }
         // Update renderer
