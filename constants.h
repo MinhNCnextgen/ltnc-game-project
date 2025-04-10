@@ -18,14 +18,13 @@ class Game {
 public:
     class Note {
     public:
-        // Timing thresholds
+
         static const float EXCELLENT_THRESHOLD;
         static const float GREAT_THRESHOLD;
         static const float OK_THRESHOLD;
         static const float MISS_THRESHOLD;
         static const float LATE_THRESHOLD;
 
-        // Range boundaries
         static const float EXCELLENT_RANGE_START;
         static const float EXCELLENT_RANGE_END;
         static const float GREAT_RANGE_START;
@@ -33,7 +32,6 @@ public:
         static const float OK_RANGE_START;
         static const float OK_RANGE_END;
 
-        // Gap calculation thresholds
         static const float MISS_UPPER;
         static const float MISS_LOWER;
         static const float OK_UPPER;
@@ -43,12 +41,10 @@ public:
         static const float EXCELLENT_UPPER;
         static const float EXCELLENT_LOWER;
 
-        // Score values
         static const int OK_SCORE;
         static const int GREAT_SCORE;
         static const int EXCELLENT_SCORE;
 
-        // Note dimensions and positions
         static const int WIDTH;
         static const int HEIGHT;
         static const int SPAWN_X;

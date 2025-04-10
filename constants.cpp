@@ -1,6 +1,6 @@
 #include "constants.h"
 
-// Screen 
+// Window 
 const int Screen::WIDTH = 1280;
 const int Screen::HEIGHT = 720;
 const char* Screen::TITLE = "Drum it!";
