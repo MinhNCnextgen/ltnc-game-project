@@ -163,6 +163,7 @@ public:
 class GameSettings {
 public:
     static const int DEFAULT_HEALTH;
+    static const int LEVEL1_SPEED;
     static const int LEVEL2_SPEED;
     static const int LEVEL3_SPEED;
     static const int LEVEL4_SPEED;

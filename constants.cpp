@@ -40,8 +40,8 @@ const int Menu::Button::LEVELS_START_X = (Screen::WIDTH - (2 * Menu::Button::LEV
 const int Menu::Button::LEVELS_START_Y = (Screen::HEIGHT - (2 * Menu::Button::LEVEL_HEIGHT + Menu::Button::LEVEL_SPACING)) / 2;
 const int Menu::Button::LEVELS_ROW2_Y = Menu::Button::LEVELS_START_Y + Menu::Button::LEVEL_HEIGHT + Menu::Button::LEVEL_SPACING;
 
-const int Menu::Button::RETURN_X = 10;
-const int Menu::Button::RETURN_Y = 10;
+const int Menu::Button::RETURN_X = 15;
+const int Menu::Button::RETURN_Y = 15;
 const int Menu::Button::RETURN_SIZE = 100;
 
 const int Menu::Button::LEVELS_TEXT_X = (Screen::WIDTH - Menu::Button::LEVELS_TEXT_WIDTH - 325) / 2; 
@@ -71,8 +71,8 @@ const int GameUI::Streak::Y = 70;
 const int GameUI::Streak::WIDTH = 50;
 const int GameUI::Streak::HEIGHT = 50;
 
-const int GameUI::NoteScore::X = 250;
-const int GameUI::NoteScore::Y = (Screen::HEIGHT + 200) / 2;
+const int GameUI::NoteScore::X = 235;
+const int GameUI::NoteScore::Y = (Screen::HEIGHT + 180) / 2;
 const int GameUI::NoteScore::WIDTH = 150;
 const int GameUI::NoteScore::HEIGHT = 50;
 
@@ -107,6 +107,7 @@ const int EndGame::TEXT_HEIGHT = 40;
 
 // Level settings 
 const int GameSettings::DEFAULT_HEALTH = 100;
-const int GameSettings::LEVEL2_SPEED = 650;
-const int GameSettings::LEVEL3_SPEED = 900; 
-const int GameSettings::LEVEL4_SPEED = 1200;
+const int GameSettings::LEVEL1_SPEED = 850;
+const int GameSettings::LEVEL2_SPEED = 1000;
+const int GameSettings::LEVEL3_SPEED = 1200; 
+const int GameSettings::LEVEL4_SPEED = 1500;

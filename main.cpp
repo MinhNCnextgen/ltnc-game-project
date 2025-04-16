@@ -126,7 +126,7 @@ class GameManager{
             float height;
             
             Note(float ht, float st, bool t, int indx, GameManager* gm) :hit_time(ht), spawn_time(st), type(t), index(indx), note_hp(2) {
-                note_mask = (*gm).get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size());
+                note_mask = (*gm).get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size()); // 1 = orange; 0  = blue
                 width = Game::Note::WIDTH;
                 height = Game::Note::HEIGHT;
                 x_pos = Game::Note::SPAWN_X;  
@@ -208,39 +208,38 @@ class GameManager{
             }
         };
         struct KeyManager{
-            bool key_blue;
-            bool key_orange;
-            bool is_holding;
-            Uint32 press_time;
-            Uint32 time_held;
+            unordered_map <string, unordered_map<string, int> > key_map;
             KeyManager(){
-                reset();
+                key_map = {
+                    {"key_blue", {{"time_press",0}, {"time_held", 0}, {"is_holding", 0}}},
+                    {"key_orange", {{"time_press",0}, {"time_held", 0}, {"is_holding", 0}}},
+                };
             }
-            void reset(){
-                key_blue = 0;
-                key_orange = 0;
-                is_holding = false;
-                time_held = 0;
-                press_time = 0;
+            void reset(string key){
+                key_map[key]["time_press"] = 0;
+                key_map[key]["time_held"] = 0;
+                key_map[key]["is_holding"] = 0;
             }
-            void key_down_blue(){
-                if (!is_holding) press_time = SDL_GetTicks();
-                if (time_held == 0 && !key_orange) key_blue = 1;
-                else key_blue = 0;
-                is_holding = true;
+            void key_down(string key){
+                unordered_map <string, int>& key_val = key_map.at(key);
+                if (key_val.at("is_holding") == 0){
+                    key_val.at("is_holding") = 1;
+                    if (key_val.at("time_press") == 0) key_val.at("time_press") = SDL_GetTicks();
+                }
             }
-            void key_down_orange(){
-                if (!is_holding) press_time = SDL_GetTicks();
-                if (time_held == 0 && !key_blue) key_orange = 1;
-                else key_orange = 0;
-                is_holding = true;
-            }
-            void key_update(){
-                if (is_holding) {
-                    time_held = SDL_GetTicks() - press_time;
-                    if (time_held > 2) {
-                        key_blue = 0;
-                        key_orange = 0;
+            void update(){
+                for (auto& pair : key_map){
+                    if ((pair.first == "key_blue" ? SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F]:SDL_GetKeyboardState(NULL)[SDL_SCANCODE_J])){
+                        key_down(pair.first);                    
+                        unordered_map <string, int>& key_val = pair.second;
+                        if (key_val.at("is_holding") == 1) {
+                            key_val.at("time_held") = SDL_GetTicks() - key_val.at("time_press");
+                            if ( key_val.at("time_held") > 0) {
+                                key_val.at("is_holding") = 0;
+                            }
+                        }
+                    }else{
+                        reset(pair.first);
                     }
                 }
             }
@@ -344,8 +343,8 @@ class GameManager{
                     }
                 }
             }
-            key_press.key_update();
             // Check if note hit
+            key_press.update();
             if (!active_notes.empty()){
                 Note* front_note;
                 float error_gap;
@@ -360,18 +359,18 @@ class GameManager{
                     }
                 }
                 if(front_note){
-                    if ((key_press.key_blue && front_note->type == 0) || (key_press.key_orange && front_note->type == 1)){
-                        key_press.reset();
+                    if ((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 0) || (key_press.key_map["key_orange"]["is_holding"] == 1 && front_note->type == 1)){
+                        // key_press.reset();
                         update_point(error_gap);
                         front_note->delete_note(this);
                         auto it = find(active_notes.begin(), active_notes.end(), front_note);
                         active_notes.erase(it);
                         game_stats.stats_update();
                     }
-                    if((key_press.key_blue && front_note->type == 1) || (key_press.key_orange && front_note->type == 0)){
+                    if((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 1) || (key_press.key_map["key_orange"]["is_holding"] == 1  && front_note->type == 0)){
                         front_note->note_hp -= 1;
                         if (front_note->note_hp<=1){
-                            key_press.reset();
+                            // key_press.reset();
                             auto it = find(active_notes.begin(), active_notes.end(), front_note);
                             it = active_notes.erase(it);
                             game_stats.multiplier = 1;
@@ -382,6 +381,7 @@ class GameManager{
                     }
                 }
             }
+            // Check game conditions
             if (game_stats.health <= 0){
                 game_stats.final = "lose";
                 game_audio.cleanup();
@@ -491,6 +491,16 @@ class Text{
             TTF_CloseFont(font);
         }
 };
+void initialize_level(GameManager*& game, SDL_Renderer* renderer, const string& data_path, const char* music_path, int health, float speed) {
+    game = new GameManager(renderer, data_path, music_path, {
+        {"health", health},
+        {"speed", speed}
+    });
+    game->game_time.start_timer();
+    game->game_audio.play_song();
+    game->in_game = true;
+}
+
 //Main
 int main(int argc, char* argv[])
 {
@@ -549,65 +559,25 @@ int main(int argc, char* argv[])
                         if (play_button.is_hovering()) screen_state = "levels_menu";
                         if (quit_button.is_hovering()) running = false;
                     }else if(screen_state == "levels_menu"){
-                        if (level_2.is_hovering()) {
+                        if (level_1.is_hovering()){
                             screen_state = "play";
-                            game = new GameManager(renderer, "beatmaps/lvl2.txt", "sfx/songs/lvl2.mp3",{
-                                {"health", GameSettings::DEFAULT_HEALTH},
-                                {"speed", GameSettings::LEVEL2_SPEED}
-                            });
-                            game->game_audio.play_song();
-                            game->game_time.start_timer();
-                            game->in_game = true;
+                            initialize_level(game, renderer, "beatmaps/lvl1.txt", "sfx/songs/lvl1.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL1_SPEED);
+                        }
+                        else if (level_2.is_hovering()) {
+                            screen_state = "play";
+                            initialize_level(game, renderer, "beatmaps/lvl2.txt", "sfx/songs/lvl2.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL2_SPEED);
                         }else if(level_3.is_hovering()){
                             screen_state = "play";
-                            game = new GameManager(renderer, "beatmaps/lvl3.txt", "sfx/songs/lvl3.mp3",{
-                                {"health", GameSettings::DEFAULT_HEALTH},
-                                {"speed", GameSettings::LEVEL3_SPEED}
-                            });
-                            game->game_time.start_timer();
-                            game->game_audio.play_song();
-                            game->in_game = true;
+                            initialize_level(game, renderer, "beatmaps/lvl3.txt", "sfx/songs/lvl3.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL3_SPEED);
                         }else if(level_4.is_hovering()){
                                 screen_state = "play";
-                                game = new GameManager(renderer, "beatmaps/lvl4.txt", "sfx/songs/lvl4.mp3",{
-                                    {"health", GameSettings::DEFAULT_HEALTH*100},
-                                    {"speed", GameSettings::LEVEL4_SPEED}
-                                });
-                                game->game_time.start_timer();
-                                game->game_audio.play_song();
-                                game->in_game = true;
+                                initialize_level(game, renderer, "beatmaps/lvl4.txt", "sfx/songs/lvl4.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL4_SPEED);
                         }else if(return_to_screen.is_hovering()){
                             screen_state = "main_menu";
                         }
                     }else if(screen_state == "end_game"){
                         if (return_to_screen.is_hovering()){
                             screen_state = "levels_menu";
-                        }
-                    }
-                    break;
-                case SDL_KEYDOWN:
-                    if (screen_state == "play" && game->in_game){
-                        switch (event.key.keysym.sym)
-                        {
-                        case SDLK_f:
-                            game->key_press.key_down_blue();
-                            break;
-                        case SDLK_j:
-                            game->key_press.key_down_orange();
-                            break;
-                        }
-                    }
-                    break;
-                case SDL_KEYUP:
-                    if (screen_state == "play" && game->in_game){
-                        switch (event.key.keysym.sym)
-                        {
-                        case SDLK_f:
-                            game->key_press.reset();
-                            break;
-                        case SDLK_j:
-                            game->key_press.reset();
-                            break;
                         }
                     }
                     break;
@@ -684,3 +654,4 @@ int main(int argc, char* argv[])
     quitSDL(window, renderer);
     return 0;
 }
+
