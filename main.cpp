@@ -51,7 +51,7 @@ void quitSDL(SDL_Window* window, SDL_Renderer* renderer)
     SDL_Quit();
 }
 
-//Texture class
+//Graphic
 class Texture {
     public: 
         SDL_Renderer* renderer;
@@ -87,7 +87,6 @@ class Texture {
         }
 };
 
-//Menu classes
 class MenuButton : public Texture{
     public:
         int mouseX, mouseY;
@@ -109,7 +108,65 @@ class Background : public Texture{
             SDL_RenderCopy(renderer, texture, NULL, NULL);
         }
 };
-//Game class
+class Text{
+    public:
+        TTF_Font* font;
+        SDL_Color text_color;
+        SDL_Surface* text_surface;
+        SDL_Renderer* renderer;
+        SDL_Texture* text_texture;
+        SDL_Rect dest;
+        const char* message;
+        int font_size;
+        Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg) : renderer(ren), message(msg.c_str()), font_size(f_size){
+            set_color(msg_color);
+            font = TTF_OpenFont(font_path, font_size);
+            text_surface = TTF_RenderText_Blended(font, message, text_color);
+            text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+        }
+        void render(float x, float y, float width, float height,const char* new_message = NULL, string new_color = ""){
+            int textWidth, textHeight;
+            SDL_QueryTexture(text_texture, NULL, NULL, &textWidth, &textHeight);
+            dest.x = x;
+            dest.y = y;
+            dest.w = textWidth;
+            dest.h = textHeight;
+            if (new_message){
+                SDL_DestroyTexture(text_texture);
+                SDL_FreeSurface(text_surface);
+                message = new_message;
+                if (!new_color.empty()){
+                    set_color(new_color);
+                }
+                text_surface = TTF_RenderText_Blended(font, message, text_color);
+                text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+            }
+            SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+        }
+        void set_color(string color){
+            if (color == "Black") {
+                text_color = {0, 0, 0, 255}; 
+            } else if (color == "White") {
+                text_color = {255, 255, 255, 255};
+            } else if (color == "Red"){
+                text_color = {255, 0, 0, 255};
+            } else if (color == "Blue"){
+                text_color = {64, 224, 208, 255};
+            }else if (color == "Yellow"){
+                text_color = {255, 255, 0, 255};
+            }else if (color == "Green"){
+                text_color = {0, 255, 0, 255};
+            }else{
+                text_color = {255, 255, 255, 255};
+            }
+        }
+        ~Text(){
+            SDL_DestroyTexture(text_texture);
+            SDL_FreeSurface(text_surface);
+            TTF_CloseFont(font);
+        }
+};
+//logic
 class GameManager{
     public:
         SDL_Renderer* renderer;
@@ -479,65 +536,6 @@ class GameManager{
         }
 };
 unordered_map<int, Texture*> GameManager::Note::textures;
-
-class Text{
-    public:
-        TTF_Font* font;
-        SDL_Color text_color;
-        SDL_Surface* text_surface;
-        SDL_Renderer* renderer;
-        SDL_Texture* text_texture;
-        SDL_Rect dest;
-        const char* message;
-        int font_size;
-        Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg) : renderer(ren), message(msg.c_str()), font_size(f_size){
-            set_color(msg_color);
-            font = TTF_OpenFont(font_path, font_size);
-            text_surface = TTF_RenderText_Blended(font, message, text_color);
-            text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-        }
-        void render(float x, float y, float width, float height,const char* new_message = NULL, string new_color = ""){
-            int textWidth, textHeight;
-            SDL_QueryTexture(text_texture, NULL, NULL, &textWidth, &textHeight);
-            dest.x = x;
-            dest.y = y;
-            dest.w = textWidth;
-            dest.h = textHeight;
-            if (new_message){
-                SDL_DestroyTexture(text_texture);
-                SDL_FreeSurface(text_surface);
-                message = new_message;
-                if (!new_color.empty()){
-                    set_color(new_color);
-                }
-                text_surface = TTF_RenderText_Blended(font, message, text_color);
-                text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-            }
-            SDL_RenderCopy(renderer, text_texture, NULL, &dest);
-        }
-        void set_color(string color){
-            if (color == "Black") {
-                text_color = {0, 0, 0, 255}; 
-            } else if (color == "White") {
-                text_color = {255, 255, 255, 255};
-            } else if (color == "Red"){
-                text_color = {255, 0, 0, 255};
-            } else if (color == "Blue"){
-                text_color = {64, 224, 208, 255};
-            }else if (color == "Yellow"){
-                text_color = {255, 255, 0, 255};
-            }else if (color == "Green"){
-                text_color = {0, 255, 0, 255};
-            }else{
-                text_color = {255, 255, 255, 255};
-            }
-        }
-        ~Text(){
-            SDL_DestroyTexture(text_texture);
-            SDL_FreeSurface(text_surface);
-            TTF_CloseFont(font);
-        }
-};
 void initialize_level(GameManager*& game, SDL_Renderer* renderer, string beatmap_path) {
     // Construct the file path
     string file_path = "beatmaps/" + beatmap_path + "/data.json";
@@ -555,21 +553,17 @@ void initialize_level(GameManager*& game, SDL_Renderer* renderer, string beatmap
 //Main
 int main(int argc, char* argv[])
 {
-    //Init
+    //render
     SDL_Window* window = initSDL(Screen::WIDTH, Screen::HEIGHT, Screen::TITLE);
     SDL_Renderer* renderer = createRenderer(window);
-    //Game texture 
-    //Menu - Main screen
     Background background_menu(renderer, "assets/menu/background.png");
     MenuButton play_button(renderer, "assets/menu/Play Button.png");
     MenuButton quit_button(renderer, "assets/menu/Quit Button.png");
-    //Menu - levels
     Text text_choose_levels(renderer, "font/Aller_bd.ttf", 84, "Blue", "SELECT LEVEL");
     MenuButton level_1(renderer, "assets/menu/lvl1.png");
     MenuButton level_2(renderer, "assets/menu/lvl2.png");
     MenuButton level_3(renderer, "assets/menu/lvl3.png");
     MenuButton level_4(renderer, "assets/menu/lvl4.png");
-    //Play
     Background background_game(renderer, "assets/play/game_bg.png");
     Texture drum(renderer, "assets/play/drum.png");
     Texture drum_left(renderer, "assets/play/drum_left.png");
@@ -585,7 +579,6 @@ int main(int argc, char* argv[])
     GameManager* game = nullptr; 
     unordered_map <string, int> game_output;
     bool paused = false;
-    //End game
     MenuButton return_to_screen(renderer, "assets/end_screen/back.png");
     Texture score_board(renderer, "assets/end_screen/scoreboard.png");
     Text final_score(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
@@ -650,7 +643,7 @@ int main(int argc, char* argv[])
                     } else if (screen_state == "levels_menu" ) {
                         screen_state = "main_menu";
                     } else if (screen_state == "end_game"){
-                        screen_state = "levels_menu"
+                        screen_state = "levels_menu";
                     }
                 }
                 break;
@@ -658,13 +651,15 @@ int main(int argc, char* argv[])
         }
         // Clear renderer
         SDL_RenderClear(renderer);
-        // Render textures
+        // Render 
         if (screen_state == "main_menu"){
+            //menu
             background_menu.render_background();
             play_button.render(Menu::Button::PLAY_X, Menu::Button::PLAY_Y, Menu::Button::PLAY_WIDTH, Menu::Button::PLAY_HEIGHT);
             quit_button.render(Menu::Button::QUIT_X, Menu::Button::QUIT_Y, Menu::Button::QUIT_WIDTH, Menu::Button::QUIT_HEIGHT);
 
         }else if (screen_state == "levels_menu"){
+            //levels
             background_menu.render_background();
             text_choose_levels.render(Menu::Button::LEVELS_TEXT_X, Menu::Button::LEVELS_TEXT_Y, Menu::Button::LEVELS_TEXT_WIDTH, Menu::Button::LEVELS_TEXT_HEIGHT);
             return_to_screen.render(Menu::Button::RETURN_X, Menu::Button::RETURN_Y, Menu::Button::RETURN_SIZE, Menu::Button::RETURN_SIZE);
@@ -674,6 +669,7 @@ int main(int argc, char* argv[])
             level_4.render(Menu::Button::LEVELS_START_X + Menu::Button::LEVEL_WIDTH + Menu::Button::LEVEL_SPACING, Menu::Button::LEVELS_ROW2_Y, Menu::Button::LEVEL_WIDTH, Menu::Button::LEVEL_HEIGHT);
         }
         else if (screen_state == "play"){
+            //game_display
             if (game->in_game){        
                 background_game.render_background();
                 lane.render(0, GameUI::Lane::Y, Screen::WIDTH, GameUI::Lane::HEIGHT);
