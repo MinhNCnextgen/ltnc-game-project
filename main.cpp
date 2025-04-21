@@ -9,9 +9,10 @@
 #include <vector>
 #include <string>
 #include <cmath>
-#include "constants.h"
+#include "src/include/json/json.hpp"
+#include "constants.hpp"
 using namespace std;
-
+using json = nlohmann::json;
 string screen_state = "main_menu";
 
 void logErrorAndExit(const char* msg, const char* error){
@@ -112,13 +113,13 @@ class Background : public Texture{
 class GameManager{
     public:
         SDL_Renderer* renderer;
-        unordered_map <int, Texture*> textures;
         struct Note {
             float spawn_time;
             float hit_time;
             bool type;
             int index;
             Texture* note_mask;
+            static unordered_map <int, Texture*> textures;
             int note_hp;
             float x_pos;
             float y_pos;
@@ -126,7 +127,7 @@ class GameManager{
             float height;
             
             Note(float ht, float st, bool t, int indx, GameManager* gm) :hit_time(ht), spawn_time(st), type(t), index(indx), note_hp(2) {
-                note_mask = (*gm).get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size()); // 1 = orange; 0  = blue
+                note_mask = get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size(), gm); // 1 = orange; 0  = blue
                 width = Game::Note::WIDTH;
                 height = Game::Note::HEIGHT;
                 x_pos = Game::Note::SPAWN_X;  
@@ -140,30 +141,46 @@ class GameManager{
                 note_mask->render(x_pos, y_pos, width, height);
             }
             
-            void update_position(float new_x) {
-                x_pos = new_x;
+            void update_position(float new_x = -1) {
+                if (new_x != -1) x_pos = new_x;
                 note_mask->render(x_pos, y_pos, width, height);
             }
             void delete_note(GameManager* gm){
                 note_mask->destroy();
                 note_mask = NULL;
-                delete gm->textures[index];
-                gm->textures.erase(index);
+                delete textures[index];
+                textures.erase(index);
+            }
+            
+            static Texture* get_note_texture(const char* path, int note_index, GameManager* gm) {
+                if (textures.find(note_index) == textures.end()) {
+                    textures[note_index] = new Texture(gm->renderer, path);
+                }
+                return textures[note_index];
             }
         };
-        struct TimeManager{
-            Uint32 start_time; // milisecond 
+        struct TimeManager {
+            Uint32 start_time; 
             Uint32 previous_time;
-            Uint32 current_time; 
+            Uint32 current_time;
             Uint32 elapsed_time;
             Uint32 last_frame_time;
+            Uint32 pause_duration; 
+            Uint32 pause_start_time; 
+            bool is_paused;
+        
+            TimeManager() : start_time(0), previous_time(0), current_time(0), elapsed_time(0), last_frame_time(0), pause_duration(0), pause_start_time(0), is_paused(false) {}
+        
             void update() {
-                previous_time = current_time; 
-                current_time = SDL_GetTicks();
-                elapsed_time = current_time - start_time;
-                last_frame_time = current_time - previous_time;  
-                if (last_frame_time > GameTiming::FPS) last_frame_time = GameTiming::FPS;
+                if (!is_paused) {
+                    previous_time = current_time;
+                    current_time = SDL_GetTicks() - pause_duration;
+                    elapsed_time = current_time - start_time; // Corrected elapsed time calculation
+                    last_frame_time = current_time - previous_time;
+                    if (last_frame_time > GameTiming::FPS) last_frame_time = GameTiming::FPS;
+                }
             }
+        
             void start_timer() {
                 Uint32 current_ticks = SDL_GetTicks();
                 start_time = current_ticks;
@@ -171,6 +188,22 @@ class GameManager{
                 current_time = current_ticks;
                 elapsed_time = 0;
                 last_frame_time = 0;
+                pause_duration = 0;
+                is_paused = false;
+            }
+        
+            void pause() {
+                if (!is_paused) {
+                    pause_start_time = SDL_GetTicks(); // Record when the pause started
+                    is_paused = true;
+                }
+            }
+        
+            void unpause() {
+                if (is_paused) {
+                    pause_duration += SDL_GetTicks() - pause_start_time; // Add the pause duration to the total
+                    is_paused = false;
+                }
             }
         };
         struct StatsManager{
@@ -186,7 +219,7 @@ class GameManager{
             int highest_streak;
             string final;
             const char* last_note_score;
-            StatsManager(unordered_map <string, int> settings) : health(settings["health"]), speed(settings["speed"]), point(0), multiplier(1), last_note_score(""), excellent_notes(0),
+            StatsManager(int hp, int spd) : health(hp), speed(spd), point(0), multiplier(1), last_note_score(""), excellent_notes(0),
                                       great_notes(0), ok_notes(0), missed_notes(0), accuracy(0), highest_streak(0) {} 
             void stats_update(){
                 highest_streak = max(highest_streak, multiplier-1);
@@ -249,6 +282,7 @@ class GameManager{
             Mix_Chunk* hit_sound;
             Uint32 song_duration;
             AudioManager(const char* song_path, const char* hitsound_path){
+                cout<<song_path<<endl;
                 song = Mix_LoadMUS(song_path);
                 hit_sound = Mix_LoadWAV(hitsound_path);
                 song_duration = Mix_MusicDuration(song);
@@ -263,6 +297,14 @@ class GameManager{
                 Mix_FreeChunk(hit_sound);
                 Mix_FreeMusic(song);
             }
+            void pause(){
+                Mix_PauseMusic();
+                Mix_HaltChannel(-1);
+            }
+            void unpause(){
+                Mix_ResumeMusic();
+                Mix_Resume(-1);
+            }
         };
         KeyManager key_press;
         AudioManager game_audio;
@@ -270,127 +312,118 @@ class GameManager{
         StatsManager game_stats;
         vector <Note> note_list;
         vector <Note*> active_notes;
-        size_t next_note_index;
+        int next_note_index;
         bool in_game;
-        GameManager(SDL_Renderer* ren, string data_path, const char* music_path, unordered_map <string, int> settings) 
-            : renderer(ren), game_stats(settings), next_note_index(0), game_audio(music_path, "sfx/sound/soft-hitnormal.wav"), in_game(true) {
-            ifstream file(data_path);
-            if (!file.is_open()) {
-                cout << "Failed to open data file!" << endl;
-                exit(1);
-            }
-            string line;
-            int count = 0;
-            while (getline(file, line)){
-                string time = "";
-                bool type;
-                for (int i=0;i<line.size();i++){
-                    if (i==0){
-                        type = line[0] - '0';
-                    }
-                    if(i>=2){
-                        time+=line[i];
-                    }
-                }
-                float hit_time = stof(time)*1000.0f;
+        GameManager(SDL_Renderer* ren, json beatmap) 
+            : renderer(ren), 
+            game_stats(beatmap["settings"]["default_health"], beatmap["settings"]["default_speed"]), 
+            next_note_index(0), 
+            game_audio((string("beatmaps/" + string(beatmap["directory"]) + "song.mp3")).c_str(), "sfx/sound/soft-hitnormal.wav"), 
+            in_game(true) {
+            for(int i=0;i<beatmap["note_list"].size();i++){
+                float hit_time = float(beatmap["note_list"][i][1])*1000.0f;
                 float distance = Screen::WIDTH + 100.0f;
                 float time_needed = (distance / game_stats.speed) * 1000.0f;
                 float spawn_time = hit_time - time_needed;
-                note_list.emplace_back(hit_time, spawn_time, type, count, this); 
-                count++;
+                bool note_type = (beatmap["note_list"][i][0] != 0);
+                note_list.emplace_back(hit_time, spawn_time, note_type, i, this);
             }
-            file.close();
             
         }
-        ~GameManager() {
-            for (auto& pair : textures) {
+        ~GameManager() {    
+            for (auto& pair : Note::textures) {
                 delete pair.second;
             }
             game_audio.cleanup();
         }
-        Texture* get_note_texture(const char* path, int note_index) {
-            if (textures.find(note_index) == textures.end()) {
-                textures[note_index] = new Texture(renderer, path);
-            }
-            return textures[note_index];
-        }
-        void game_update(){
-            game_time.update();
-            // Spawn new notes
-            if (!note_list.empty() && next_note_index < note_list.size()){
-                Note& curr_note = note_list[next_note_index];
-                if (game_time.elapsed_time >= curr_note.spawn_time) {
-                    curr_note.spawn();
-                    active_notes.push_back(&curr_note);
-                    next_note_index++;
-                }
-            }
-            // Update existing notes
-            if (!active_notes.empty()){
-                float new_x;
-                for (auto it = active_notes.begin(); it != active_notes.end();) { 
-                    new_x = (*it)->x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
-                    if (new_x < 125){
-                        (*it)->delete_note(this);
-                        it = active_notes.erase(it);
-                        game_stats.multiplier = 1;
-                        game_stats.health-=1;
-                        game_stats.last_note_score = "Missed";
-                        game_stats.stats_update();
-                    } else {
-                        (*it)->update_position(new_x);
-                        ++it;
+        void game_update(bool is_paused){
+            if (!is_paused){
+                game_time.update();
+                // Spawn new notes
+                if (!note_list.empty() && next_note_index < note_list.size()){
+                    Note& curr_note = note_list[next_note_index];
+                    if (game_time.elapsed_time >= curr_note.spawn_time) {
+                        curr_note.spawn();
+                        active_notes.push_back(&curr_note);
+                        next_note_index++;
                     }
                 }
-            }
-            // Check if note hit
-            key_press.update();
-            if (!active_notes.empty()){
-                Note* front_note;
-                float error_gap;
-                for(auto it = active_notes.begin(); it!=active_notes.end(); ++it){
-                    front_note = *it;
-                    error_gap = front_note->hit_time - game_time.elapsed_time;
-                    if (error_gap <= Game::Note::MISS_UPPER && error_gap >= Game::Note::MISS_LOWER && front_note->x_pos <= Game::Note::HIT_X){
-                        break;
-                    } else {
-                        front_note = nullptr;
-                        error_gap = 0.0f;
-                    }
-                }
-                if(front_note){
-                    if ((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 0) || (key_press.key_map["key_orange"]["is_holding"] == 1 && front_note->type == 1)){
-                        // key_press.reset();
-                        update_point(error_gap);
-                        front_note->delete_note(this);
-                        auto it = find(active_notes.begin(), active_notes.end(), front_note);
-                        active_notes.erase(it);
-                        game_stats.stats_update();
-                    }
-                    if((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 1) || (key_press.key_map["key_orange"]["is_holding"] == 1  && front_note->type == 0)){
-                        front_note->note_hp -= 1;
-                        if (front_note->note_hp<=1){
-                            // key_press.reset();
-                            auto it = find(active_notes.begin(), active_notes.end(), front_note);
+                
+                // Update existing notes
+                if (!active_notes.empty()){
+                    float new_x;
+                    for (auto it = active_notes.begin(); it != active_notes.end();) { 
+                        new_x = (*it)->x_pos - (game_stats.speed * (float(game_time.last_frame_time) / 1000.0f));
+                        if (new_x < 125){
+                            (*it)->delete_note(this);
                             it = active_notes.erase(it);
                             game_stats.multiplier = 1;
                             game_stats.health-=1;
                             game_stats.last_note_score = "Missed";
                             game_stats.stats_update();
+                        } else {
+                            (*it)->update_position(new_x);
+                            ++it;
                         }
                     }
                 }
-            }
-            // Check game conditions
-            if (game_stats.health <= 0){
-                game_stats.final = "lose";
-                game_audio.cleanup();
-                in_game = false;
-            }
-            if(game_time.elapsed_time > game_audio.song_duration*1000.0f+3000.0f){
-                game_stats.final = "win";
-                game_audio.cleanup();
-                in_game = false;
+                
+                // Check if note hit
+                key_press.update();
+                if (!active_notes.empty()){
+                    Note* front_note;
+                    float error_gap;
+                    for(auto it = active_notes.begin(); it!=active_notes.end(); ++it){
+                        front_note = *it;
+                        error_gap = front_note->hit_time - game_time.elapsed_time;
+                        if (error_gap <= Game::Note::MISS_UPPER && error_gap >= Game::Note::MISS_LOWER && front_note->x_pos <= Game::Note::HIT_X){
+                            break;
+                        } else {
+                            front_note = nullptr;
+                            error_gap = 0.0f;
+                        }
+                    }
+                    if(front_note){
+                        if ((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 0) || (key_press.key_map["key_orange"]["is_holding"] == 1 && front_note->type == 1)){
+                            // key_press.reset();
+                            update_point(error_gap);
+                            front_note->delete_note(this);
+                            auto it = find(active_notes.begin(), active_notes.end(), front_note);
+                            active_notes.erase(it);
+                            game_stats.stats_update();
+                        }
+                        if((key_press.key_map["key_blue"]["is_holding"] == 1 && front_note->type == 1) || (key_press.key_map["key_orange"]["is_holding"] == 1  && front_note->type == 0)){
+                            front_note->note_hp -= 1;
+                            if (front_note->note_hp<=1){
+                                // key_press.reset();
+                                auto it = find(active_notes.begin(), active_notes.end(), front_note);
+                                it = active_notes.erase(it);
+                                game_stats.multiplier = 1;
+                                game_stats.health-=1;
+                                game_stats.last_note_score = "Missed";
+                                game_stats.stats_update();            
+                                
+
+                            }
+                        }
+                    }
+                }
+                // Check game conditions
+                if (game_stats.health <= 0){
+                    game_stats.final = "lose";
+                    game_audio.cleanup();
+                    in_game = false;
+                }
+                if(game_time.elapsed_time > game_audio.song_duration*1000.0f+3000.0f){
+                    game_stats.final = "win";
+                    game_audio.cleanup();
+                    in_game = false;
+                }
+            }else{
+                for (auto it = active_notes.begin(); it != active_notes.end();) { 
+                    (*it)->update_position();
+                    ++it;
+                }
             }
         }
         void update_point(float gap){
@@ -445,6 +478,8 @@ class GameManager{
             };
         }
 };
+unordered_map<int, Texture*> GameManager::Note::textures;
+
 class Text{
     public:
         TTF_Font* font;
@@ -456,20 +491,12 @@ class Text{
         const char* message;
         int font_size;
         Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg) : renderer(ren), message(msg.c_str()), font_size(f_size){
-            if (msg_color == "Black") {
-                text_color = {0, 0, 0, 255}; 
-            } else if (msg_color == "White") {
-                text_color = {255, 255, 255, 255};
-            } else if (msg_color == "Red"){
-                text_color = {255, 0, 0, 255};
-            } else if (msg_color == "Blue"){
-                text_color = {64, 224, 208, 255};
-            }
+            set_color(msg_color);
             font = TTF_OpenFont(font_path, font_size);
             text_surface = TTF_RenderText_Blended(font, message, text_color);
             text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
         }
-        void render(float x, float y, float width, float height,const char* new_message = NULL){
+        void render(float x, float y, float width, float height,const char* new_message = NULL, string new_color = ""){
             int textWidth, textHeight;
             SDL_QueryTexture(text_texture, NULL, NULL, &textWidth, &textHeight);
             dest.x = x;
@@ -480,10 +507,30 @@ class Text{
                 SDL_DestroyTexture(text_texture);
                 SDL_FreeSurface(text_surface);
                 message = new_message;
+                if (!new_color.empty()){
+                    set_color(new_color);
+                }
                 text_surface = TTF_RenderText_Blended(font, message, text_color);
                 text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
             }
             SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+        }
+        void set_color(string color){
+            if (color == "Black") {
+                text_color = {0, 0, 0, 255}; 
+            } else if (color == "White") {
+                text_color = {255, 255, 255, 255};
+            } else if (color == "Red"){
+                text_color = {255, 0, 0, 255};
+            } else if (color == "Blue"){
+                text_color = {64, 224, 208, 255};
+            }else if (color == "Yellow"){
+                text_color = {255, 255, 0, 255};
+            }else if (color == "Green"){
+                text_color = {0, 255, 0, 255};
+            }else{
+                text_color = {255, 255, 255, 255};
+            }
         }
         ~Text(){
             SDL_DestroyTexture(text_texture);
@@ -491,14 +538,18 @@ class Text{
             TTF_CloseFont(font);
         }
 };
-void initialize_level(GameManager*& game, SDL_Renderer* renderer, const string& data_path, const char* music_path, int health, float speed) {
-    game = new GameManager(renderer, data_path, music_path, {
-        {"health", health},
-        {"speed", speed}
-    });
+void initialize_level(GameManager*& game, SDL_Renderer* renderer, string beatmap_path) {
+    // Construct the file path
+    string file_path = "beatmaps/" + beatmap_path + "/data.json";
+    ifstream file(file_path);
+    json beatmap;
+    file >> beatmap;
+    // Initialize the game
+    game = new GameManager(renderer, beatmap);
     game->game_time.start_timer();
     game->game_audio.play_song();
     game->in_game = true;
+    file.close();
 }
 
 //Main
@@ -519,68 +570,90 @@ int main(int argc, char* argv[])
     MenuButton level_3(renderer, "assets/menu/lvl3.png");
     MenuButton level_4(renderer, "assets/menu/lvl4.png");
     //Play
+    Background background_game(renderer, "assets/play/game_bg.png");
     Texture drum(renderer, "assets/play/drum.png");
     Texture drum_left(renderer, "assets/play/drum_left.png");
     Texture drum_right(renderer, "assets/play/drum_right.png");
     Texture hit_box(renderer, "assets/play/hitbox.png");
     Texture lane(renderer, "assets/play/lane.png");
-    Text score(renderer, "font/Aller_bd.ttf", 54, "Black", "");
-    Text streak(renderer, "font/Aller_bd.ttf", 54, "Black", "");
-    Text note_score(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text health(renderer, "font/Aller_bd.ttf", 54, "Black", "");
-    // Text accuracy(renderer, "font/Aller_bd.ttf", 54, "Black", "");
+    Text score(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");
+    Text streak(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");
+    Text note_score(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");
+    Text health(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");
+    Text accuracy(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");
+    Text game_time(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "White", "");    
+    GameManager* game = nullptr; 
+    unordered_map <string, int> game_output;
+    bool paused = false;
     //End game
     MenuButton return_to_screen(renderer, "assets/end_screen/back.png");
     Texture score_board(renderer, "assets/end_screen/scoreboard.png");
-    Text final_score(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text game_result(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text accuracy(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text highest_streak(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text great_notes(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text excellent_notes(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text ok_notes(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    Text missed_notes(renderer, "font/Aller_bd.ttf", 34, "Black", "");
-    GameManager* game = nullptr; 
-    unordered_map <string, int> game_output;
+    Text final_score(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text game_result(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text final_acc(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text highest_streak(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text great_notes(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text excellent_notes(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text ok_notes(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+    Text missed_notes(renderer, "font/Aller_bd.ttf", GameUI::TEXT_SIZE, "Black", "");
+
     //Game loop
     bool running = true;
     Uint32 frame_start, frame_time;
-
     SDL_Event event;
     while (running) {
         frame_start = SDL_GetTicks();
         while (SDL_PollEvent(&event)) {
             switch (event.type){
-                case SDL_QUIT:
-                    running = false;
-                    break;
-                case SDL_MOUSEBUTTONDOWN:
-                    if (screen_state == "main_menu"){
-                        if (play_button.is_hovering()) screen_state = "levels_menu";
-                        if (quit_button.is_hovering()) running = false;
-                    }else if(screen_state == "levels_menu"){
-                        if (level_1.is_hovering()){
-                            screen_state = "play";
-                            initialize_level(game, renderer, "beatmaps/lvl1.txt", "sfx/songs/lvl1.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL1_SPEED);
+            case SDL_QUIT:
+                running = false;
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+                if (screen_state == "main_menu"){
+                if (play_button.is_hovering()) screen_state = "levels_menu";
+                if (quit_button.is_hovering()) running = false;
+                }else if(screen_state == "levels_menu"){
+                if (level_1.is_hovering()){
+                    screen_state = "play";
+                    initialize_level(game, renderer, "map1");
+                }
+                else if (level_2.is_hovering()) {
+                    screen_state = "play";
+                    initialize_level(game, renderer, "map2");
+                }else if(level_3.is_hovering()){
+                    screen_state = "play";
+                    initialize_level(game, renderer, "map3");
+                }else if(level_4.is_hovering()){
+                    screen_state = "play";
+                    initialize_level(game, renderer, "map4");
+                }else if(return_to_screen.is_hovering()){
+                    screen_state = "main_menu";
+                }
+                }else if(screen_state == "end_game"){
+                if (return_to_screen.is_hovering()){
+                    screen_state = "levels_menu";
+                }
+                }
+                break;
+            case SDL_KEYDOWN:
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    if (screen_state == "play") {
+                        if (!paused){
+                            paused = true;
+                            game->game_time.pause();
+                            game->game_audio.pause();
+                        }else{
+                            paused = false;
+                            game->game_time.unpause();
+                            game->game_audio.unpause();
                         }
-                        else if (level_2.is_hovering()) {
-                            screen_state = "play";
-                            initialize_level(game, renderer, "beatmaps/lvl2.txt", "sfx/songs/lvl2.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL2_SPEED);
-                        }else if(level_3.is_hovering()){
-                            screen_state = "play";
-                            initialize_level(game, renderer, "beatmaps/lvl3.txt", "sfx/songs/lvl3.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL3_SPEED);
-                        }else if(level_4.is_hovering()){
-                                screen_state = "play";
-                                initialize_level(game, renderer, "beatmaps/lvl4.txt", "sfx/songs/lvl4.mp3", GameSettings::DEFAULT_HEALTH, GameSettings::LEVEL4_SPEED);
-                        }else if(return_to_screen.is_hovering()){
-                            screen_state = "main_menu";
-                        }
-                    }else if(screen_state == "end_game"){
-                        if (return_to_screen.is_hovering()){
-                            screen_state = "levels_menu";
-                        }
+                    } else if (screen_state == "levels_menu" ) {
+                        screen_state = "main_menu";
+                    } else if (screen_state == "end_game"){
+                        screen_state = "levels_menu"
                     }
-                    break;
+                }
+                break;
             }
         }
         // Clear renderer
@@ -602,37 +675,49 @@ int main(int argc, char* argv[])
         }
         else if (screen_state == "play"){
             if (game->in_game){        
-                background_menu.render_background();
+                background_game.render_background();
                 lane.render(0, GameUI::Lane::Y, Screen::WIDTH, GameUI::Lane::HEIGHT);
                 hit_box.render(GameUI::Hitbox::X, GameUI::Hitbox::Y, GameUI::Hitbox::SIZE, GameUI::Hitbox::SIZE);
-                game->game_update();
                 drum.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
-                if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F]) {
-                    drum_left.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
-                }
-                if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_J]) {
-                    drum_right.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
+                if (!paused){
+                    game->game_update(paused);
+                    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F]) {
+                        drum_left.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
+                    }
+                    if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_J]) {
+                        drum_right.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
+                    }
+                }else{
+                    game->game_update(paused);
                 }
                 score.render(GameUI::Score::X, GameUI::Score::Y, GameUI::Score::WIDTH, GameUI::Score::HEIGHT, ("Score: " + to_string(game->game_stats.point)).c_str());
                 streak.render(GameUI::Streak::X, GameUI::Streak::Y, GameUI::Streak::WIDTH, GameUI::Streak::HEIGHT, ("x" + to_string(game->game_stats.multiplier-1)).c_str());
-                note_score.render(GameUI::NoteScore::X, GameUI::NoteScore::Y, GameUI::NoteScore::WIDTH, GameUI::NoteScore::HEIGHT, (game->game_stats.last_note_score));
+                accuracy.render(GameUI::Accuracy::X, GameUI::Accuracy::Y, GameUI::Accuracy::WIDTH, GameUI::Accuracy::HEIGHT, ("Accuracy: " + to_string(int(round(game->game_stats.accuracy))) + "%").c_str());
+                game_time.render(GameUI::Time::X, GameUI::Time::Y, GameUI::Time::WIDTH, GameUI::Time::HEIGHT, ("Time Left: " + to_string(((game->game_audio.song_duration+3) * 1000 - game->game_time.elapsed_time) / 1000) + "s").c_str());
+                note_score.render(GameUI::NoteScore::X, GameUI::NoteScore::Y, GameUI::NoteScore::WIDTH, GameUI::NoteScore::HEIGHT, 
+                    (game->game_stats.last_note_score), 
+                    (string(game->game_stats.last_note_score) == "Excellent" ? "Blue" : 
+                     string(game->game_stats.last_note_score) == "Great" ? "Green" : 
+                     string(game->game_stats.last_note_score) == "Ok" ? "Yellow" : "Red")
+                );
                 health.render(GameUI::Health::X, GameUI::Health::Y, GameUI::Health::WIDTH, GameUI::Health::HEIGHT, ("Health: " + to_string(game->game_stats.health)).c_str());
             }else{
                 game_output = game->get_final_stats();
                 screen_state = "end_game";
-                game = nullptr;
+                if (!game){
+                    delete game;
+                    game = nullptr;
+                }
             }
         }else if (screen_state == "end_game"){
             background_menu.render_background();
             score_board.render(EndGame::SCOREBOARD_X, EndGame::SCOREBOARD_Y, EndGame::SCOREBOARD_WIDTH, EndGame::SCOREBOARD_HEIGHT);
             return_to_screen.render(Menu::Button::RETURN_X, Menu::Button::RETURN_Y, Menu::Button::RETURN_SIZE, Menu::Button::RETURN_SIZE);
-            
             int base_x = EndGame::SCOREBOARD_X + EndGame::TEXT_OFFSET_X;
             int base_y = EndGame::SCOREBOARD_Y + EndGame::TEXT_OFFSET_Y;
-            
             final_score.render(base_x, base_y, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Final Score: " + to_string(game_output["score"])).c_str());
             game_result.render(base_x, base_y + EndGame::TEXT_SPACING, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Result: " + string(game_output["type"] == 1 ? "Pass" : "Fail")).c_str());
-            accuracy.render(base_x, base_y + EndGame::TEXT_SPACING * 2, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Accuracy: " + to_string(game_output["accuracy"]) + "%").c_str());
+            final_acc.render(base_x, base_y + EndGame::TEXT_SPACING * 2, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Accuracy: " + to_string(game_output["accuracy"]) + "%").c_str());
             highest_streak.render(base_x, base_y + EndGame::TEXT_SPACING * 3, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Highest Streak: " + to_string(game_output["highest_streak"])).c_str());
             excellent_notes.render(base_x, base_y + EndGame::TEXT_SPACING * 4, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Excellent Notes: " + to_string(game_output["excellent_notes"])).c_str());
             great_notes.render(base_x, base_y + EndGame::TEXT_SPACING * 5, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT, ("Great Notes: " + to_string(game_output["great_notes"])).c_str());
