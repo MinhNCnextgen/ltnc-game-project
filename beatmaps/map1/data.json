@@ -3,7 +3,7 @@
     "directory" : "map1/",
     "settings" : {
         "default_speed": 1200,
-        "default_health" : 10
+        "default_health" : 1000
     },
     "map_background" : "background.png",
     "note_list" :[

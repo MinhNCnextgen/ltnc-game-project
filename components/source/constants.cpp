@@ -1,5 +1,4 @@
-#ifndef CONSTANTS_HPP
-#define CONSTANTS_HPP
+#include "../header/constants.hpp"
 
 // Window
 namespace Screen {
@@ -151,5 +150,3 @@ namespace EndGame {
     const int TEXT_WIDTH = 500;
     const int TEXT_HEIGHT = 40;
 }
-
-#endif
