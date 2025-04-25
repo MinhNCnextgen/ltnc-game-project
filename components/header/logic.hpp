@@ -69,15 +69,15 @@ public:
     };
 
     SDL_Renderer* renderer;
-    KeyManager key_press = nullptr; // Initialize to avoid warnings
+    KeyManager key_press;
     AudioManager game_audio;
     int next_note_index;
     TimeManager game_time;
     StatsManager game_stats;
     std::vector<Note> note_list;
     std::vector<Note*> active_notes;
-    bool in_game = false;          // Initialize to avoid warnings
-
+    bool in_game;          
+    json beatmap;
     GameManager(SDL_Renderer* ren, json beatmap);
     ~GameManager();
 

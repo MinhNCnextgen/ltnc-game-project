@@ -6,6 +6,7 @@
 #include "SDL_mixer.h"
 #include <string>
 #include "constants.hpp"
+#include <functional>
 using namespace std;
 
 // Hàm khởi tạo, renderer, quit
@@ -28,17 +29,20 @@ public:
     void destroy();
 };
 
-class MenuButton : public Texture {
-public:
-    int mouseX, mouseY;
-    MenuButton(SDL_Renderer* ren, const char* path);
-    bool is_hovering();
+class Button : public Texture {
+    public:
+        function <void()> on_click;
+        int mouseX, mouseY;
+        Button(SDL_Renderer* ren, const char* path, function<void()> callback);
+        bool is_hovering();
+        void is_click(SDL_Event* event);
 };
 
 class Background : public Texture {
 public:
     Background(SDL_Renderer* ren, const char* path);
     void render_background();
+    void render_background_blur();
 };
 
 class Text {

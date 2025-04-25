@@ -9,20 +9,21 @@ std::unordered_map<int, Texture*> GameManager::Note::textures;
  
 // --- GameManager Methods ---
 
-GameManager::GameManager(SDL_Renderer* ren, json beatmap)
+GameManager::GameManager(SDL_Renderer* ren, json bm)
     : renderer(ren),
-      game_audio(("beatmaps/" + std::string(beatmap["directory"]) + "/song.mp3").c_str(), "sfx/sound/drum-hitclap.wav", "sfx/sound/drum-hitfinish.wav"),
+      beatmap(bm),
+      game_audio(("beatmaps/" + std::string(bm["directory"]) + "/song.mp3").c_str(), "sfx/sound/drum-hitclap.wav", "sfx/sound/drum-hitfinish.wav"),
       next_note_index(0),
-      game_stats(beatmap["settings"]["default_health"], beatmap["settings"]["default_speed"]),
+      game_stats(bm["settings"]["default_health"], bm["settings"]["default_speed"]),
       in_game(true),
       key_press(this)
 {
-    for (size_t i = 0; i < beatmap["note_list"].size(); ++i) {
-        float hit_time = beatmap["note_list"][i][1].get<float>() * 1000.0f;
+    for (size_t i = 0; i < bm["note_list"].size(); ++i) {
+        float hit_time = bm["note_list"][i][1].get<float>() * 1000.0f;
         float distance = Screen::WIDTH + 100.0f;
         float time_needed = (distance / game_stats.speed) * 1000.0f;
         float spawn_time = hit_time - time_needed;
-        bool note_type = (beatmap["note_list"][i][0] != 0);
+        bool note_type = (bm["note_list"][i][0] != 0);
         note_list.emplace_back(hit_time, spawn_time, note_type, i, this);
     }
 }
@@ -311,7 +312,7 @@ void GameManager::KeyManager::update() {
 
 void initialize_level(GameManager*& game, SDL_Renderer* renderer, string beatmap_path) {
     if (game) {
-        delete game; // Clean up the previous instance
+        delete game; 
         game = nullptr;
     }
 

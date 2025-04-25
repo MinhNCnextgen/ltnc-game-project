@@ -79,17 +79,41 @@ void Texture::destroy() {
     }
 }
 
-MenuButton::MenuButton(SDL_Renderer* ren, const char* path) : Texture(ren, path) {}
+Button::Button(SDL_Renderer* ren, const char* path, std::function<void()> call_back) : Texture(ren, path), on_click(call_back) {}
 
-bool MenuButton::is_hovering() {
+bool Button::is_hovering() {
     SDL_GetMouseState(&mouseX, &mouseY);
-    return mouseX > dest.x && mouseX < dest.x + dest.w && mouseY > dest.y && mouseY < dest.y + dest.h;
+    if (mouseX > dest.x && mouseX < dest.x + dest.w && mouseY > dest.y && mouseY < dest.y + dest.h){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+void Button::is_click(SDL_Event* event){
+    bool hovered = is_hovering();
+    if (event->type == SDL_MOUSEBUTTONDOWN){
+        if (hovered){
+            on_click();
+        }
+    }
 }
 
 Background::Background(SDL_Renderer* ren, const char* path) : Texture(ren, path) {}
 
 void Background::render_background() {
     SDL_RenderCopy(renderer, texture, NULL, NULL);
+}
+void Background::render_background_blur() {
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_ADD);
+    SDL_SetTextureAlphaMod(texture, 7); 
+    int blurRadius = 2; 
+    for (int dx = -blurRadius; dx <= blurRadius; ++dx) {
+        for (int dy = -blurRadius; dy <= blurRadius; ++dy) {
+            SDL_Rect dest = { dx, dy, Screen::WIDTH, Screen::HEIGHT };
+            SDL_RenderCopy(renderer, texture, NULL, &dest);
+        }
+    }
 }
 
 Text::Text(SDL_Renderer* ren, const char* font_path, int f_size, std::string msg_color, std::string msg) 

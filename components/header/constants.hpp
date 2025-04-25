@@ -135,6 +135,21 @@ namespace GameUI {
         extern const int HEIGHT;
     }
     extern const int TEXT_SIZE;
+
+    namespace PauseBoard {
+        extern const int WIDTH;
+        extern const int HEIGHT;
+        extern const int X;
+        extern const int Y;
+    }
+
+    namespace PauseButton {
+        extern const int WIDTH;
+        extern const int HEIGHT;
+        extern const int SPACING;
+        extern const int START_X;
+        extern const int START_Y;
+    }
 }
 
 // End game screen

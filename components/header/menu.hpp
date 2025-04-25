@@ -8,4 +8,4 @@
 #include "constants.hpp"
 using namespace std;
 
-void render_main_menu(SDL_Renderer* renderer, Background& bg, MenuButton& play_btn, MenuButton& quit_btn);
+void render_main_menu(SDL_Renderer* renderer, Background& bg, Button& play_btn, Button& quit_btn);

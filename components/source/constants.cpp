@@ -134,6 +134,21 @@ namespace GameUI {
         const int HEIGHT = 50;
     }
     const int TEXT_SIZE = 34;
+
+    namespace PauseBoard {
+        const int WIDTH = 800;
+        const int HEIGHT = 600;
+        const int X = (Screen::WIDTH - WIDTH) / 2;
+        const int Y = (Screen::HEIGHT - HEIGHT) / 2;
+    }
+
+    namespace PauseButton {
+        const int WIDTH = 400;
+        const int HEIGHT = 100;
+        const int SPACING = 40;
+        const int START_X = PauseBoard::X + (PauseBoard::WIDTH - WIDTH) / 2;
+        const int START_Y = PauseBoard::Y + (PauseBoard::HEIGHT - (3 * HEIGHT + 2 * SPACING)) / 2;
+    }
 }
 
 // End game screen

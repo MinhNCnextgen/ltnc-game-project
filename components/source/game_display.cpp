@@ -3,7 +3,7 @@
 #include <cmath>
 
 void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
-                        Background& bg,
+                        Background*& bg,
                         Texture& lane,
                         Texture& hit_box,
                         Texture& drum,
@@ -14,47 +14,69 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Text& note_score,
                         Text& health,
                         Text& accuracy,
-                        Text& game_time_text) {
+                        Text& game_time_text, Texture& pause_board, Texture& menu_btn, Texture& restart_btn, Texture& play_btn) {
     if (game){
-        bg.render_background();
+        if (!bg){
+            std::cout<<"test background: ";
+            std::cout<<("beatmaps/" + string(game->beatmap["directory"]) + "background.png").c_str()<<endl;
+            bg = new Background(renderer, ("beatmaps/" + string(game->beatmap["directory"]) + "background.png").c_str());
+        }
+        bg->render_background_blur();
         lane.render(0, GameUI::Lane::Y, Screen::WIDTH, GameUI::Lane::HEIGHT);
         hit_box.render(GameUI::Hitbox::X, GameUI::Hitbox::Y, GameUI::Hitbox::SIZE, GameUI::Hitbox::SIZE);
         drum.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
-    
+
+        game->game_update(paused);
+
+        score.render(GameUI::Score::X, GameUI::Score::Y, GameUI::Score::WIDTH, GameUI::Score::HEIGHT,
+            ("Score: " + std::to_string(game->game_stats.point)).c_str());
+        streak.render(GameUI::Streak::X, GameUI::Streak::Y, GameUI::Streak::WIDTH, GameUI::Streak::HEIGHT,
+                    ("x" + std::to_string(game->game_stats.multiplier - 1)).c_str());
+        accuracy.render(GameUI::Accuracy::X, GameUI::Accuracy::Y, GameUI::Accuracy::WIDTH, GameUI::Accuracy::HEIGHT,
+                    ("Accuracy: " + std::to_string(int(round(game->game_stats.accuracy))) + "%").c_str());
+        game_time_text.render(GameUI::Time::X, GameUI::Time::Y, GameUI::Time::WIDTH, GameUI::Time::HEIGHT,
+                            ("Time Left: " + std::to_string(((game->game_audio.song_duration + 3) * 1000 - game->game_time.elapsed_time) / 1000) + "s").c_str());
+        note_score.render(GameUI::NoteScore::X, GameUI::NoteScore::Y, GameUI::NoteScore::WIDTH, GameUI::NoteScore::HEIGHT,
+                        game->game_stats.last_note_score,
+                        std::string(game->game_stats.last_note_score) == "Excellent" ? "Blue" :
+                        std::string(game->game_stats.last_note_score) == "Great" ? "Green" :
+                        std::string(game->game_stats.last_note_score) == "Ok" ? "Yellow" : "Red");
+        health.render(GameUI::Health::X, GameUI::Health::Y, GameUI::Health::WIDTH, GameUI::Health::HEIGHT,
+                    ("Health: " + std::to_string(game->game_stats.health)).c_str());
         if (!paused) {
-            game->game_update(paused);
             if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F]) {
                 drum_left.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
             }
             if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_J]) {
                 drum_right.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
             }
+
         } else {
-            game->game_update(paused);
+            // Render pausing
+            int pause_board_x = GameUI::PauseBoard::X;
+            int pause_board_y = GameUI::PauseBoard::Y;
+            pause_board.render(pause_board_x, pause_board_y, GameUI::PauseBoard::WIDTH, GameUI::PauseBoard::HEIGHT);
+
+            int button_width = GameUI::PauseButton::WIDTH;
+            int button_height = GameUI::PauseButton::HEIGHT;
+            int button_spacing = GameUI::PauseButton::SPACING;
+
+            int buttons_start_x = GameUI::PauseButton::START_X;
+            int buttons_start_y = GameUI::PauseButton::START_Y;
+
+            menu_btn.render(buttons_start_x, buttons_start_y, button_width, button_height);
+            restart_btn.render(buttons_start_x, buttons_start_y + button_height + button_spacing, button_width, button_height);
+            play_btn.render(buttons_start_x, buttons_start_y + 2 * (button_height + button_spacing), button_width, button_height);
         }
     
-        score.render(GameUI::Score::X, GameUI::Score::Y, GameUI::Score::WIDTH, GameUI::Score::HEIGHT,
-                     ("Score: " + std::to_string(game->game_stats.point)).c_str());
-        streak.render(GameUI::Streak::X, GameUI::Streak::Y, GameUI::Streak::WIDTH, GameUI::Streak::HEIGHT,
-                      ("x" + std::to_string(game->game_stats.multiplier - 1)).c_str());
-        accuracy.render(GameUI::Accuracy::X, GameUI::Accuracy::Y, GameUI::Accuracy::WIDTH, GameUI::Accuracy::HEIGHT,
-                        ("Accuracy: " + std::to_string(int(round(game->game_stats.accuracy))) + "%").c_str());
-        game_time_text.render(GameUI::Time::X, GameUI::Time::Y, GameUI::Time::WIDTH, GameUI::Time::HEIGHT,
-                              ("Time Left: " + std::to_string(((game->game_audio.song_duration + 3) * 1000 - game->game_time.elapsed_time) / 1000) + "s").c_str());
-        note_score.render(GameUI::NoteScore::X, GameUI::NoteScore::Y, GameUI::NoteScore::WIDTH, GameUI::NoteScore::HEIGHT,
-                          game->game_stats.last_note_score,
-                          std::string(game->game_stats.last_note_score) == "Excellent" ? "Blue" :
-                          std::string(game->game_stats.last_note_score) == "Great" ? "Green" :
-                          std::string(game->game_stats.last_note_score) == "Ok" ? "Yellow" : "Red");
-        health.render(GameUI::Health::X, GameUI::Health::Y, GameUI::Health::WIDTH, GameUI::Health::HEIGHT,
-                      ("Health: " + std::to_string(game->game_stats.health)).c_str());
+
     }
 }
 
 void render_end_game(SDL_Renderer* renderer,
                      Background& bg,
                      Texture& scoreboard,
-                     MenuButton& return_btn,
+                     Button& return_btn,
                      Text& final_score,
                      Text& result,
                      Text& acc,

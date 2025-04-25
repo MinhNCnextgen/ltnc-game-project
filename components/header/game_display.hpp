@@ -11,7 +11,7 @@
 #include <unordered_map>
 using namespace std;
 void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
-                        Background& bg,
+                        Background*& bg,
                         Texture& lane,
                         Texture& hit_box,
                         Texture& drum,
@@ -22,12 +22,16 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Text& note_score,
                         Text& health,
                         Text& accuracy,
-                        Text& game_time);
+                        Text& game_time,
+                        Texture& pause_board, 
+                        Texture& menu_btn, 
+                        Texture& restart_btn, 
+                        Texture& play_btn);
 
 void render_end_game(SDL_Renderer* renderer,
                      Background& bg,
                      Texture& scoreboard,
-                     MenuButton& return_btn,
+                     Button& return_btn,
                      Text& final_score,
                      Text& result,
                      Text& acc,
