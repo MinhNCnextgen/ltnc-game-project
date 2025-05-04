@@ -3,12 +3,12 @@
 - Họ và tên: Nguyễn Công Minh. <br>
 - Mã số sinh viên: 24022817. <br> 
 - Tên đề tài: Trò chơi nhịp điệu theo nhạc (Drum it!). <br>
-- Video demo sản phẩm: https://www.youtube.com/watch?v=Gy2TiDo9upw <br>
+- Video demo sản phẩm: https://www.youtube.com/watch?v=Gy2TiDo9upw . <br>
 ---
 
 ## Mô tả trò chơi
 - Drum It! là tựa game theo nhạc dựa trên trò chơi thùng Nhật Bản nổi tiếng "Taiko no Tatsujin". Người chơi sẽ phải sử dụng nút để căn thời gian chuẩn cho từng nốt. tuỳ vào độ chính xác của mỗi lần đanh nốt, người
-  chơi sẽ nhậnd dược số điểm tương ứng. Mục tiêu của trò chơi là vượt qua được hết bài nhạc và đạt số điểm cao nhất có thể
+  chơi sẽ nhậnd dược số điểm tương ứng. Mục tiêu của trò chơi là vượt qua được hết bài nhạc và đạt số điểm cao nhất có thể.
 
 ## Cách chơi
 
@@ -68,7 +68,7 @@
   - logic: logic chính của gameplay, quản lý tất cả các cơ chế liên quan đến note (load, tạo, di chuyển, tính điểm, ...)
   - constants: các hằng số của game như vị trí, kích thước của ảnh,... <br>
   - menu, levels, game_display: là các màn hình của game. <br>
-- ./beatmaps: lưu trữ các dữ liệu về từng bài nhạc. file gồm có: background, song và 1 file data.json chứa thông tin về các tốc độ di chuyển của nốt, số máu và đặc biệt là dữ liệu của tất cả các nốt.<br>
+- ./beatmaps: lưu trữ các dữ liệu về từng bài nhạc. một beatmap là một thư mục gồm có: background.png, song.mp3 và 1 file data.json chứa thông tin về các tốc độ di chuyển của nốt, số máu và đặc biệt là dữ liệu của tất cả các nốt.<br>
 
 ### Các cơ chế quan trọng của game:
 
