@@ -2,7 +2,7 @@
     "map_name" : "Montagem Ladrao",
     "directory" : "map3/",
     "settings" : {
-        "default_speed": 1700,
+        "default_speed": 1600,
         "default_health" : 10
     },
     "map_background" : "background.png",

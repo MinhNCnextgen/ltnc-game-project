@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
     });
 
     // Levels
-    Text text_choose_levels(renderer, "font/Aller_bd.ttf", 84, "Blue", "SELECT LEVEL");
+    Text text_choose_levels(renderer, "font/Aller_bd.ttf", 84, "Green", "SELECT LEVEL");
     Button level_1(renderer, "assets/menu/lvl1.png", [&game, &renderer, &menu_music]{
         screen_state = "play";
         initialize_level(game, renderer, "map1");

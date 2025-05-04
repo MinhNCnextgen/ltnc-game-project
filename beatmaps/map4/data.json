@@ -3,7 +3,7 @@
     "directory" : "map4/",
     "settings" : {
         "default_speed": 1700,
-        "default_health" : 1000
+        "default_health" : 50
     },
     "note_list" :[
         [0, 5.154],
