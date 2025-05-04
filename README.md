@@ -1,7 +1,7 @@
 
 # Bài tập lớn lập trình nâng cao
 - Họ và tên: Nguyễn Công Minh. <br>
-- Mã số sinh viên: 24022817. <br> 
+- Mã số sinh viên: 24022816. <br> 
 - Tên đề tài: Trò chơi nhịp điệu theo nhạc (Drum it!). <br>
 - Video demo sản phẩm: https://www.youtube.com/watch?v=Gy2TiDo9upw . <br>
 ---
