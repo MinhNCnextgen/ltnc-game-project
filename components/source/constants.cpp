@@ -26,15 +26,15 @@ namespace Game {
         const int SPAWN_X = Screen::WIDTH + 300;
         const int Y = (Screen::HEIGHT - HEIGHT) / 2;
         const int HIT_X = 400;
-
+        const int DEATH_X = 125;
         // Game note
-        const float MISS_UPPER = 400.0f;
-        const float MISS_LOWER = -50.0f;
-        const float OK_UPPER = 300.0f;
-        const float OK_LOWER = -70.0f;
-        const float GREAT_UPPER = 200.0f;
-        const float GREAT_LOWER = -30.0f;
-        const float EXCELLENT_UPPER = 60.0f;
+        const float MISS_UPPER = 200.0f;
+        const float MISS_LOWER = -200.0f;
+        const float OK_UPPER = 150.0f;
+        const float OK_LOWER = -150.0f;
+        const float GREAT_UPPER = 80.0f;
+        const float GREAT_LOWER = -80.0f;
+        const float EXCELLENT_UPPER = 30.0f;
         const float EXCELLENT_LOWER = -30.0f;
     }
 }
@@ -132,6 +132,13 @@ namespace GameUI {
         const int Y = 10;
         const int WIDTH = 150;
         const int HEIGHT = 50;
+    }
+    namespace StreakFlame{
+        const int X = -175;
+        const int Y = Screen::HEIGHT - 165;
+        const int WIDTH = Screen::WIDTH + 350;
+        const int HEIGHT = 250;
+        const int APPEAR = 15;
     }
     const int TEXT_SIZE = 34;
 

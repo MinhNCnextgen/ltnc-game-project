@@ -1,11 +1,10 @@
 {
-    "map_name" : "Example name",
+    "map_name" : "dj TAKA - quaver",
     "directory" : "map4/",
     "settings" : {
-        "default_speed": 1500,
+        "default_speed": 1700,
         "default_health" : 1000
     },
-    "map_background" : "background.png",
     "note_list" :[
         [0, 5.154],
         [0, 5.813],

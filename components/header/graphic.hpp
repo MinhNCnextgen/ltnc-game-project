@@ -7,6 +7,7 @@
 #include <string>
 #include "constants.hpp"
 #include <functional>
+
 using namespace std;
 
 // Hàm khởi tạo, renderer, quit
@@ -25,13 +26,13 @@ public:
     Texture(SDL_Renderer* ren, const char* p);
     ~Texture();
 
-    void render(float x, float y, float w, float h);
+    void render(float x, float y, float w, float h, SDL_Rect* src_rect = NULL);
     void destroy();
 };
 
 class Button : public Texture {
     public:
-        function <void()> on_click;
+        function<void()> on_click;
         int mouseX, mouseY;
         Button(SDL_Renderer* ren, const char* path, function<void()> callback);
         bool is_hovering();
@@ -56,9 +57,21 @@ public:
     const char* message;
     int font_size;
 
-    Text(SDL_Renderer* ren, const char* font_path, int f_size, std::string msg_color, std::string msg);
+    Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg);
     ~Text();
 
-    void render(float x, float y, float width, float height, const char* new_message = NULL, std::string new_color = "");
-    void set_color(std::string color);
+    void render(float x, float y, float width, float height, const char* new_message = NULL, string new_color = "");
+    void set_color(string color);
+};
+
+class Animation : public Texture{
+    public:
+    vector<SDL_Rect> frames;
+    SDL_Rect curr_frame;
+    int total_frames, curr_frame_index;
+    Uint32 last_frame_time, frame_duration;
+    bool freeze;
+    Animation(SDL_Renderer* ren, const char* p, vector<SDL_Rect> f, Uint32 f_durr);
+    bool is_frame_time();
+    void render_next_frame(float x, float y, float width, float height);
 };

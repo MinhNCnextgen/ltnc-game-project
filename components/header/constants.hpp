@@ -1,5 +1,4 @@
-#ifndef CONSTANTS_HPP
-#define CONSTANTS_HPP
+#pragma once
 
 // Window
 namespace Screen {
@@ -27,7 +26,7 @@ namespace Game {
         extern const int SPAWN_X;
         extern const int Y;
         extern const int HIT_X;
-
+        extern const int DEATH_X;
         // Game note
         extern const float MISS_UPPER;
         extern const float MISS_LOWER;
@@ -134,6 +133,13 @@ namespace GameUI {
         extern const int WIDTH;
         extern const int HEIGHT;
     }
+    namespace StreakFlame{
+        extern const int X;
+        extern const int Y;
+        extern const int WIDTH;
+        extern const int HEIGHT;
+        extern const int APPEAR;
+    }
     extern const int TEXT_SIZE;
 
     namespace PauseBoard {
@@ -166,5 +172,3 @@ namespace EndGame {
     extern const int TEXT_WIDTH;
     extern const int TEXT_HEIGHT;
 }
-
-#endif

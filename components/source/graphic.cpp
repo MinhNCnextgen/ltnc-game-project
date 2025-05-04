@@ -2,6 +2,8 @@
 #include "graphic.hpp"
 #include <iostream>
 
+using namespace std;
+
 void logErrorAndExit(const char* msg, const char* error) {
     SDL_LogMessage(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_ERROR, "%s: %s", msg, error);
     SDL_Quit();
@@ -64,12 +66,12 @@ Texture::~Texture() {
     destroy();
 }
 
-void Texture::render(float x, float y, float w, float h) {
+void Texture::render(float x, float y, float w, float h, SDL_Rect* src_rect) {
     dest.x = x;
     dest.y = y;
     dest.w = w;
     dest.h = h;
-    SDL_RenderCopy(renderer, texture, NULL, &dest);
+    SDL_RenderCopy(renderer, texture, src_rect, &dest);
 }
 
 void Texture::destroy() {
@@ -79,7 +81,7 @@ void Texture::destroy() {
     }
 }
 
-Button::Button(SDL_Renderer* ren, const char* path, std::function<void()> call_back) : Texture(ren, path), on_click(call_back) {}
+Button::Button(SDL_Renderer* ren, const char* path, function<void()> call_back) : Texture(ren, path), on_click(call_back) {}
 
 bool Button::is_hovering() {
     SDL_GetMouseState(&mouseX, &mouseY);
@@ -116,7 +118,7 @@ void Background::render_background_blur() {
     }
 }
 
-Text::Text(SDL_Renderer* ren, const char* font_path, int f_size, std::string msg_color, std::string msg) 
+Text::Text(SDL_Renderer* ren, const char* font_path, int f_size, string msg_color, string msg) 
     : renderer(ren), font_size(f_size), message(msg.c_str()) {
     set_color(msg_color);
     font = TTF_OpenFont(font_path, font_size);
@@ -130,7 +132,7 @@ Text::~Text() {
     TTF_CloseFont(font);
 }
 
-void Text::render(float x, float y, float width, float height, const char* new_message, std::string new_color) {
+void Text::render(float x, float y, float width, float height, const char* new_message, string new_color) {
     int textWidth, textHeight;
     SDL_QueryTexture(text_texture, NULL, NULL, &textWidth, &textHeight);
     dest.x = x;
@@ -149,7 +151,7 @@ void Text::render(float x, float y, float width, float height, const char* new_m
     SDL_RenderCopy(renderer, text_texture, NULL, &dest);
 }
 
-void Text::set_color(std::string color) {
+void Text::set_color(string color) {
     if (color == "Black") text_color = {0, 0, 0, 255};
     else if (color == "White") text_color = {255, 255, 255, 255};
     else if (color == "Red") text_color = {255, 0, 0, 255};
@@ -157,4 +159,59 @@ void Text::set_color(std::string color) {
     else if (color == "Yellow") text_color = {255, 255, 0, 255};
     else if (color == "Green") text_color = {0, 255, 0, 255};
     else text_color = {255, 255, 255, 255};
+}
+
+// class Animation : public Texture{
+//     public:
+//     vector <SDL_Rect> frames;
+//     SDL_Rect curr_frame;
+//     int total_frames, curr_frame_index;
+//     Uint32 last_frame_time, frame_duration;
+//     Animation(SDL_Renderer* renderer, const char& p, vector <SDL_Rect> f, Uint32 f_durr);
+//     bool is_frame_time();
+//     void render_next_frame;
+// }
+// Timing::AnimationTimeManager::AnimationTimeManager(Uint32 f_duration){
+//     last_frame_time = SDL_GetTicks();
+//     frame_duration = f_duration;
+// }
+
+// bool Timing::AnimationTimeManager::is_frame_time() {
+//     Uint32 curr_time = SDL_GetTicks();
+//     if ((curr_time - last_frame_time) >= frame_duration) {
+//         last_frame_time = curr_time; 
+//         return true;
+//     }
+//     return false;
+// }
+
+Animation::Animation(SDL_Renderer* ren, const char* p, vector<SDL_Rect> f, Uint32 f_durr) : 
+    Texture(ren, p),
+    frames(f),
+    curr_frame(f[0]),
+    total_frames(f.size()),
+    curr_frame_index(0),
+    last_frame_time(SDL_GetTicks()),
+    frame_duration(f_durr),
+    freeze(false) {}
+
+bool Animation::is_frame_time() {
+    Uint32 curr_time = SDL_GetTicks();
+    if ((curr_time - last_frame_time) >= frame_duration) {
+        last_frame_time = curr_time; 
+        return true;
+    }
+    return false;
+}
+
+void Animation::render_next_frame(float x, float y, float width, float height) {
+    if (is_frame_time() && !freeze) {
+        if (curr_frame_index == total_frames - 1) {
+            curr_frame_index = 0;
+        } else {
+            ++curr_frame_index;
+        }
+        curr_frame = frames[curr_frame_index];
+    }
+    render(x, y, width, height, &curr_frame);
 }

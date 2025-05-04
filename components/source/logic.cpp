@@ -1,18 +1,14 @@
-// logic.cpp
 #include "logic.hpp"
 #include <iostream>
 
 using namespace std;
 
-// Define static member
-std::unordered_map<int, Texture*> GameManager::Note::textures;
- 
-// --- GameManager Methods ---
+unordered_map<int, Texture*> GameManager::Note::textures;
 
 GameManager::GameManager(SDL_Renderer* ren, json bm)
     : renderer(ren),
       beatmap(bm),
-      game_audio(("beatmaps/" + std::string(bm["directory"]) + "/song.mp3").c_str(), "sfx/sound/drum-hitclap.wav", "sfx/sound/drum-hitfinish.wav"),
+      game_audio(("beatmaps/" + string(bm["directory"]) + "/song.mp3").c_str(), "sfx/sound/drum-hitclap.wav", "sfx/sound/drum-hitfinish.wav", "sfx/sound/combobreak.wav"),
       next_note_index(0),
       game_stats(bm["settings"]["default_health"], bm["settings"]["default_speed"]),
       in_game(true),
@@ -44,7 +40,7 @@ void GameManager::game_update(bool is_paused) {
     if (!is_paused && in_game) {
         game_time.update();
 
-        if (!note_list.empty() && next_note_index < static_cast<int>(note_list.size())) {
+        if (!note_list.empty() && next_note_index < int(note_list.size())) {
             Note& note = note_list[next_note_index];
             if (game_time.elapsed_time >= note.spawn_time) {
                 note.spawn();
@@ -57,14 +53,15 @@ void GameManager::game_update(bool is_paused) {
         for (auto it = active_notes.begin(); it != active_notes.end();) {
             Note* current_note = *it;
             if (!current_note) {
-                it = active_notes.erase(it); // Remove null pointers
+                it = active_notes.erase(it); 
                 continue;
             }
 
             new_x = current_note->x_pos - (game_stats.speed * game_time.last_frame_time / 1000.0f);
-            if (new_x < 125) {
+            if (new_x < Game::Note::DEATH_X) {
                 current_note->delete_note(this);
                 it = active_notes.erase(it);
+                if (game_stats.multiplier - 1 >= GameUI::StreakFlame::APPEAR) game_audio.play_hitsound(2);
                 game_stats.multiplier = 1;
                 game_stats.health--;
                 game_stats.last_note_score = "Missed";
@@ -99,6 +96,7 @@ void GameManager::game_update(bool is_paused) {
                     front->note_hp--;
                     if (front->note_hp <= 1) {
                         active_notes.erase(find(active_notes.begin(), active_notes.end(), front));
+                        if (game_stats.multiplier - 1 >= GameUI::StreakFlame::APPEAR) game_audio.play_hitsound(2);
                         game_stats.multiplier = 1;
                         game_stats.health--;
                         game_stats.last_note_score = "Missed";
@@ -123,6 +121,7 @@ void GameManager::game_update(bool is_paused) {
 
 void GameManager::update_point(float gap) {
     if (gap <= Game::Note::MISS_UPPER && gap >= Game::Note::OK_UPPER) {
+        if (game_stats.multiplier - 1 >= GameUI::StreakFlame::APPEAR) game_audio.play_hitsound(2);
         game_stats.multiplier = 1;
         game_stats.health--;
         game_stats.last_note_score = "Missed";
@@ -159,8 +158,6 @@ unordered_map<string, int> GameManager::get_final_stats() {
     };
 }
 
-
-// --- Note Methods ---
 GameManager::Note::Note(float ht, float st, bool t, int indx, GameManager* gm)
     : spawn_time(st), hit_time(ht), type(t), index(indx), note_hp(2) {
     note_mask = get_note_texture(t ? "assets/play/note_orange.png" : "assets/play/note_blue.png", (*gm).note_list.size(), gm);
@@ -200,7 +197,6 @@ Texture* GameManager::Note::get_note_texture(const char* path, int note_index, G
     return textures[note_index];
 }
 
-// --- TimeManager Methods ---
 GameManager::TimeManager::TimeManager()
     : start_time(0), previous_time(0), current_time(0), elapsed_time(0), last_frame_time(0), pause_duration(0), pause_start_time(0), is_paused(false) {}
 
@@ -210,7 +206,7 @@ void GameManager::TimeManager::update() {
         current_time = SDL_GetTicks() - pause_duration;
         elapsed_time = current_time - start_time;
         last_frame_time = current_time - previous_time;
-        if (last_frame_time > static_cast<int>(GameTiming::FPS)) {
+        if (last_frame_time > GameTiming::FPS) {
             last_frame_time = GameTiming::FPS;
         }
     }
@@ -241,7 +237,6 @@ void GameManager::TimeManager::unpause() {
     }
 }
 
-// --- StatsManager Methods ---
 GameManager::StatsManager::StatsManager(int hp, int spd)
     : health(hp), point(0), multiplier(1), excellent_notes(0), great_notes(0),
       ok_notes(0), missed_notes(0), highest_streak(0), speed(spd), accuracy(0.0f),
@@ -250,13 +245,13 @@ GameManager::StatsManager::StatsManager(int hp, int spd)
 
 void GameManager::StatsManager::stats_update() {
     highest_streak = max(highest_streak, multiplier - 1);
-    if (last_note_score == std::string("Excellent")) {
+    if (last_note_score == string("Excellent")) {
         excellent_notes++;
-    } else if (last_note_score == std::string("Great")) {
+    } else if (last_note_score == string("Great")) {
         great_notes++;
-    } else if (last_note_score == std::string("Ok")) {
+    } else if (last_note_score == string("Ok")) {
         ok_notes++;
-    } else if (last_note_score == std::string("Missed")) {
+    } else if (last_note_score == string("Missed")) {
         missed_notes++;
     }
     float total_notes = excellent_notes + great_notes + ok_notes + missed_notes;
@@ -267,7 +262,6 @@ void GameManager::StatsManager::stats_update() {
     }
 }
 
-// --- KeyManager Methods ---
 GameManager::KeyManager::KeyManager(GameManager * gm) : game(gm) {
     key_map = {
         {"key_blue", {{"time_press", 0}, {"time_held", 0}, {"is_holding", 0}}},
@@ -315,18 +309,11 @@ void initialize_level(GameManager*& game, SDL_Renderer* renderer, string beatmap
         delete game; 
         game = nullptr;
     }
-
     string file_path = "beatmaps/" + beatmap_path + "/data.json";
     ifstream file(file_path);
-    if (!file.is_open()) {
-        cerr << "Error: Unable to open file at " << file_path << endl;
-        return;
-    }
-
     json beatmap;
     file >> beatmap;
     file.close();
-
     game = new GameManager(renderer, beatmap);
     game->game_audio.play_song();
     game->game_time.start_timer();

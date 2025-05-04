@@ -25,7 +25,7 @@ public:
         bool type;
         int index;
         Texture* note_mask;
-        static std::unordered_map<int, Texture*> textures;
+        static unordered_map<int, Texture*> textures;
         int note_hp;
         float x_pos, y_pos, width, height;
 
@@ -54,13 +54,12 @@ public:
         float speed, accuracy;
         std::string final;
         const char* last_note_score;
-
         StatsManager(int hp, int spd);
         void stats_update();
     };
 
     struct KeyManager {
-        std::unordered_map<std::string, std::unordered_map<std::string, int>> key_map;
+        unordered_map<string, unordered_map<string, int>> key_map;
         GameManager* game;
         KeyManager(GameManager* gm);
         void reset(std::string key);

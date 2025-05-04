@@ -1,4 +1,3 @@
-// game_display.hpp
 #pragma once
 #include "SDL.h"
 #include "SDL_image.h"
@@ -9,7 +8,9 @@
 #include "constants.hpp"
 #include "audio.hpp"
 #include <unordered_map>
+
 using namespace std;
+
 void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Background*& bg,
                         Texture& lane,
@@ -26,7 +27,8 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Texture& pause_board, 
                         Texture& menu_btn, 
                         Texture& restart_btn, 
-                        Texture& play_btn);
+                        Texture& play_btn,
+                        Animation& streak_flame, Button& pause_btn);
 
 void render_end_game(SDL_Renderer* renderer,
                      Background& bg,
@@ -39,5 +41,5 @@ void render_end_game(SDL_Renderer* renderer,
                      Text& excellent,
                      Text& great,
                      Text& ok,
-                     Text& missed,
-                     std::unordered_map<std::string, int> game_output);
+                     Text& missed, Texture& pass, Texture& fail,
+                     unordered_map<string, int> game_output);

@@ -2,6 +2,8 @@
 #include "game_display.hpp"
 #include <cmath>
 
+using namespace std;
+
 void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Background*& bg,
                         Texture& lane,
@@ -14,12 +16,11 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
                         Text& note_score,
                         Text& health,
                         Text& accuracy,
-                        Text& game_time_text, Texture& pause_board, Texture& menu_btn, Texture& restart_btn, Texture& play_btn) {
+                        Text& game_time_text, Texture& pause_board, Texture& menu_btn, Texture& restart_btn, Texture& play_btn, Animation& streak_flame, Button& pause_btn) {
     if (game){
         if (!bg){
-            std::cout<<"test background: ";
-            std::cout<<("beatmaps/" + string(game->beatmap["directory"]) + "background.png").c_str()<<endl;
             bg = new Background(renderer, ("beatmaps/" + string(game->beatmap["directory"]) + "background.png").c_str());
+            streak_flame.freeze = false;
         }
         bg->render_background_blur();
         lane.render(0, GameUI::Lane::Y, Screen::WIDTH, GameUI::Lane::HEIGHT);
@@ -29,20 +30,23 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
         game->game_update(paused);
 
         score.render(GameUI::Score::X, GameUI::Score::Y, GameUI::Score::WIDTH, GameUI::Score::HEIGHT,
-            ("Score: " + std::to_string(game->game_stats.point)).c_str());
+            (to_string(game->game_stats.point)).c_str());
         streak.render(GameUI::Streak::X, GameUI::Streak::Y, GameUI::Streak::WIDTH, GameUI::Streak::HEIGHT,
-                    ("x" + std::to_string(game->game_stats.multiplier - 1)).c_str());
+                    ("x" + to_string(game->game_stats.multiplier - 1)).c_str());
         accuracy.render(GameUI::Accuracy::X, GameUI::Accuracy::Y, GameUI::Accuracy::WIDTH, GameUI::Accuracy::HEIGHT,
-                    ("Accuracy: " + std::to_string(int(round(game->game_stats.accuracy))) + "%").c_str());
+                    (to_string(int(round(game->game_stats.accuracy))) + "%").c_str());
         game_time_text.render(GameUI::Time::X, GameUI::Time::Y, GameUI::Time::WIDTH, GameUI::Time::HEIGHT,
-                            ("Time Left: " + std::to_string(((game->game_audio.song_duration + 3) * 1000 - game->game_time.elapsed_time) / 1000) + "s").c_str());
+                            (to_string(((game->game_audio.song_duration + 3) * 1000 - game->game_time.elapsed_time) / 1000) + "s").c_str());
         note_score.render(GameUI::NoteScore::X, GameUI::NoteScore::Y, GameUI::NoteScore::WIDTH, GameUI::NoteScore::HEIGHT,
                         game->game_stats.last_note_score,
-                        std::string(game->game_stats.last_note_score) == "Excellent" ? "Blue" :
-                        std::string(game->game_stats.last_note_score) == "Great" ? "Green" :
-                        std::string(game->game_stats.last_note_score) == "Ok" ? "Yellow" : "Red");
+                        string(game->game_stats.last_note_score) == "Excellent" ? "Blue" :
+                        string(game->game_stats.last_note_score) == "Great" ? "Green" :
+                        string(game->game_stats.last_note_score) == "Ok" ? "Yellow" : "Red");
         health.render(GameUI::Health::X, GameUI::Health::Y, GameUI::Health::WIDTH, GameUI::Health::HEIGHT,
-                    ("Health: " + std::to_string(game->game_stats.health)).c_str());
+                    ("Health: " + to_string(game->game_stats.health)).c_str());
+        if (game->game_stats.multiplier-1 >= GameUI::StreakFlame::APPEAR) {
+            streak_flame.render_next_frame(GameUI::StreakFlame::X, GameUI::StreakFlame::Y, GameUI::StreakFlame::WIDTH,GameUI::StreakFlame::HEIGHT);
+        }
         if (!paused) {
             if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F]) {
                 drum_left.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
@@ -50,7 +54,7 @@ void render_play_screen(SDL_Renderer* renderer, GameManager* game, bool paused,
             if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_J]) {
                 drum_right.render(GameUI::Drum::X, GameUI::Drum::Y, GameUI::Drum::SIZE, GameUI::Drum::SIZE);
             }
-
+            pause_btn.render(Screen::WIDTH - 110, 10, 100, 100);
         } else {
             // Render pausing
             int pause_board_x = GameUI::PauseBoard::X;
@@ -84,8 +88,8 @@ void render_end_game(SDL_Renderer* renderer,
                      Text& excellent,
                      Text& great,
                      Text& ok,
-                     Text& missed,
-                     std::unordered_map<std::string, int> game_output) {
+                     Text& missed, Texture& pass, Texture& fail,
+                     unordered_map<string, int> game_output) {
     bg.render_background();
     scoreboard.render(EndGame::SCOREBOARD_X, EndGame::SCOREBOARD_Y, EndGame::SCOREBOARD_WIDTH, EndGame::SCOREBOARD_HEIGHT);
     return_btn.render(Menu::Button::RETURN_X, Menu::Button::RETURN_Y, Menu::Button::RETURN_SIZE, Menu::Button::RETURN_SIZE);
@@ -94,19 +98,22 @@ void render_end_game(SDL_Renderer* renderer,
     int base_y = EndGame::SCOREBOARD_Y + EndGame::TEXT_OFFSET_Y;
     
     final_score.render(base_x, base_y, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                       ("Final Score: " + std::to_string(game_output["score"])).c_str());
-    result.render(base_x, base_y + EndGame::TEXT_SPACING, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                  ("Result: " + std::string(game_output["type"] == 1 ? "Pass" : "Fail")).c_str());
-    acc.render(base_x, base_y + EndGame::TEXT_SPACING * 2, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-               ("Accuracy: " + std::to_string(game_output["accuracy"]) + "%").c_str());
-    streak_text.render(base_x, base_y + EndGame::TEXT_SPACING * 3, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                       ("Highest Streak: " + std::to_string(game_output["highest_streak"])).c_str());
-    excellent.render(base_x, base_y + EndGame::TEXT_SPACING * 4, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                     ("Excellent Notes: " + std::to_string(game_output["excellent_notes"])).c_str());
-    great.render(base_x, base_y + EndGame::TEXT_SPACING * 5, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                 ("Great Notes: " + std::to_string(game_output["great_notes"])).c_str());
-    ok.render(base_x, base_y + EndGame::TEXT_SPACING * 6, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-              ("OK Notes: " + std::to_string(game_output["ok_notes"])).c_str());
-    missed.render(base_x, base_y + EndGame::TEXT_SPACING * 7, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
-                  ("Missed Notes: " + std::to_string(game_output["missed_notes"])).c_str());
+                       ("Final Score: " + to_string(game_output["score"])).c_str());
+    acc.render(base_x, base_y + EndGame::TEXT_SPACING, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+               ("Accuracy: " + to_string(game_output["accuracy"]) + "%").c_str());
+    streak_text.render(base_x, base_y + EndGame::TEXT_SPACING * 2, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+                       ("Highest Streak: " + to_string(game_output["highest_streak"])).c_str());
+    excellent.render(base_x, base_y + EndGame::TEXT_SPACING * 3, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+                     ("Excellent Notes: " + to_string(game_output["excellent_notes"])).c_str());
+    great.render(base_x, base_y + EndGame::TEXT_SPACING * 4, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+                 ("Great Notes: " + to_string(game_output["great_notes"])).c_str());
+    ok.render(base_x, base_y + EndGame::TEXT_SPACING * 5, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+              ("OK Notes: " + to_string(game_output["ok_notes"])).c_str());
+    missed.render(base_x, base_y + EndGame::TEXT_SPACING * 6, EndGame::TEXT_WIDTH, EndGame::TEXT_HEIGHT,
+                  ("Missed Notes: " + to_string(game_output["missed_notes"])).c_str());
+    if (game_output["type"] == 1){
+        pass.render((Screen::WIDTH + 100) / 2, (Screen::HEIGHT - 300) / 2, 300, 300);
+    }else{
+        fail.render((Screen::WIDTH + 100) / 2, (Screen::HEIGHT - 300) / 2, 300, 300);
+    }
 }
