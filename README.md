@@ -20,8 +20,8 @@
 ### Trong khi chơi:
 - Các nốt nhạc sẽ di chuyển từ phải sang trái.<br>
 - Sử dụng các phím:
-  - F: Đánh nốt màu xanh.<br>
-  - J: Đánh nốt màu cam.<br>
+  - F: Đánh nốt màu cam.<br>
+  - J: Đánh nốt màu xanh.<br>
 - Đánh đúng nốt khi nó nằm trong vùng "hitbox" để ghi điểm.<br>
 - Nếu đánh sai hoặc bỏ lỡ nốt thì sẽ mất máu.
 
