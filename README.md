@@ -76,4 +76,4 @@
 thời gian sinh ra của note sẽ được tính theo hit_time - time_needed (thời gian cần để di chuyển tới hitbox). <br>
 - Cơ chế tính điểm: Khi một note tới gần hitbox và trong một khoảng cách nhất định, nếu người chơi nhấn đúng nút mà để đánh nốt thì điểm sẽ được tính bằng độ trễ giữa thời điểm nhấn và hit_time từ data. Dựa vào đó,
 điểm sẽ được cộng cho người chơi theo hệ số multiplier. <br>
-- Các ảnh, âm thanh, hình ảnh đều được làm trong một cấu trúc class.
+- Các ảnh, âm thanh, hình ảnh đều được làm trong các cấu trúc class.

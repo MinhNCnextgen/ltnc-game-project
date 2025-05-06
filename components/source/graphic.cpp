@@ -81,7 +81,7 @@ void Texture::destroy() {
     }
 }
 
-Button::Button(SDL_Renderer* ren, const char* path, function<void()> call_back) : Texture(ren, path), on_click(call_back) {}
+Button::Button(SDL_Renderer* ren, const char* path, function<void()> callback) : Texture(ren, path), on_click(callback) {}
 
 bool Button::is_hovering() {
     SDL_GetMouseState(&mouseX, &mouseY);
@@ -161,30 +161,6 @@ void Text::set_color(string color) {
     else text_color = {255, 255, 255, 255};
 }
 
-// class Animation : public Texture{
-//     public:
-//     vector <SDL_Rect> frames;
-//     SDL_Rect curr_frame;
-//     int total_frames, curr_frame_index;
-//     Uint32 last_frame_time, frame_duration;
-//     Animation(SDL_Renderer* renderer, const char& p, vector <SDL_Rect> f, Uint32 f_durr);
-//     bool is_frame_time();
-//     void render_next_frame;
-// }
-// Timing::AnimationTimeManager::AnimationTimeManager(Uint32 f_duration){
-//     last_frame_time = SDL_GetTicks();
-//     frame_duration = f_duration;
-// }
-
-// bool Timing::AnimationTimeManager::is_frame_time() {
-//     Uint32 curr_time = SDL_GetTicks();
-//     if ((curr_time - last_frame_time) >= frame_duration) {
-//         last_frame_time = curr_time; 
-//         return true;
-//     }
-//     return false;
-// }
-
 Animation::Animation(SDL_Renderer* ren, const char* p, vector<SDL_Rect> f, Uint32 f_durr) : 
     Texture(ren, p),
     frames(f),
@@ -205,11 +181,11 @@ bool Animation::is_frame_time() {
 }
 
 void Animation::render_next_frame(float x, float y, float width, float height) {
-    if (is_frame_time() && !freeze) {
+    if (!freeze && is_frame_time()) {
         if (curr_frame_index == total_frames - 1) {
             curr_frame_index = 0;
         } else {
-            ++curr_frame_index;
+            curr_frame_index++;
         }
         curr_frame = frames[curr_frame_index];
     }
