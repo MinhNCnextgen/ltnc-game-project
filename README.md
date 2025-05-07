@@ -4,6 +4,7 @@
 - Mã số sinh viên: 24022816. <br> 
 - Tên đề tài: Trò chơi nhịp điệu theo nhạc (Drum it!). <br>
 - Video demo sản phẩm: https://www.youtube.com/watch?v=Gy2TiDo9upw . <br>
+- Đề xuất ngưỡng điểm: 8.5 (Lý do hãy xem phần giải thích code). <br>
 ---
 
 ## Mô tả trò chơi
@@ -74,6 +75,6 @@
 
 - Cơ chế sinh nốt: Trong file data.json, Một note_list là một mãng lưu trữ các mảng con gồm hai phần tử type và hit_time. Sử dụng thư viện Nholmann: Json, chương trình sẽ đọc file đó ra và nạp vào game. Để tính thời gian xuất hiện,
 thời gian sinh ra của note sẽ được tính theo hit_time - time_needed (thời gian cần để di chuyển tới hitbox). <br>
-- Cơ chế tính điểm: Khi một note tới gần hitbox và trong một khoảng cách nhất định, nếu người chơi nhấn đúng nút mà để đánh nốt thì điểm sẽ được tính bằng độ trễ giữa thời điểm nhấn và hit_time từ data. Dựa vào đó,
-điểm sẽ được cộng cho người chơi theo hệ số multiplier. <br>
-- Các ảnh, âm thanh, hình ảnh đều được làm trong các cấu trúc class.
+- Cơ chế tính điểm: Khi một note tới gần hitbox và trong một khoảng cách nhất định, nếu người chơi nhấn đúng nút mà để đánh nốt thì điểm sẽ được tính bằng độ trễ giữa thời điểm nhấn và hit_time từ data. Dựa vào đó, điểm sẽ được cộng cho người chơi theo hệ số multiplier. <br>
+- Các ảnh, âm thanh, hình ảnh đều được làm trong các cấu trúc class. <br>
+- Sử dụng thư viện SDL2 và có tiếp cận với một thư viện làm việc với data. <br>
