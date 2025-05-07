@@ -8,7 +8,7 @@
 
 ## Mô tả trò chơi
 - Drum It! là tựa game theo nhạc dựa trên trò chơi thùng Nhật Bản nổi tiếng "Taiko no Tatsujin". Người chơi sẽ phải sử dụng nút để căn thời gian chuẩn cho từng nốt. tuỳ vào độ chính xác của mỗi lần đanh nốt, người
-  chơi sẽ nhậnd dược số điểm tương ứng. Mục tiêu của trò chơi là vượt qua được hết bài nhạc và đạt số điểm cao nhất có thể.
+  chơi sẽ nhận dược số điểm tương ứng. Mục tiêu của trò chơi là vượt qua được hết bài nhạc và đạt số điểm cao nhất có thể.
 
 ## Cách chơi
 
